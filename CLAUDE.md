@@ -59,6 +59,9 @@ forge test --match-test testInitialization -vv
 # Run tests with detailed traces
 forge test -vvvv
 
+# Test with gas profiling
+forge test --gas-report
+
 # Deploy to Base Sepolia (testnet)
 source .env
 forge script script/Deploy.s.sol --rpc-url $BASE_SEPOLIA_RPC_URL --broadcast --verify

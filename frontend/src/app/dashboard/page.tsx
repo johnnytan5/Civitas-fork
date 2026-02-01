@@ -1,4 +1,4 @@
-import { fetchUserContracts } from '@/lib/contracts/fetch-contracts';
+import { fetchUserContracts, type RentalContract } from '@/lib/contracts/fetch-contracts';
 import { DashboardContractCard } from '@/components/dashboard/DashboardContractCard';
 
 export default async function DashboardPage() {
@@ -6,7 +6,7 @@ export default async function DashboardPage() {
   // For now, using placeholder - will be replaced with actual user address
   const userAddress = '0x0000000000000000000000000000000000000000' as `0x${string}`;
 
-  let contracts = [];
+  let contracts: RentalContract[] = [];
   try {
     contracts = await fetchUserContracts(userAddress);
   } catch (error) {

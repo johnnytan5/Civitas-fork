@@ -1,6 +1,7 @@
-import { useState } from 'use';
+import { useState } from 'react';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { FACTORY_ADDRESS, RENTAL_FACTORY_ABI } from '@/lib/contracts';
+import { FACTORY_ADDRESS } from '@/lib/contracts/constants';
+import { RENTAL_FACTORY_ABI } from '@/lib/contracts/abis';
 import { predictRentalAddress } from '@/lib/contracts/predict-address';
 import type { RentalConfig } from '@/lib/ai/schemas';
 

@@ -5,6 +5,14 @@ import { useRentalChat } from '@/hooks/useRentalChat';
 export function ChatInterface() {
   const { messages, input, handleInputChange, handleSubmit, isLoading } = useRentalChat();
 
+  // Helper to extract text content from message parts
+  const getMessageText = (message: typeof messages[number]) => {
+    return message.parts
+      .filter((part): part is { type: 'text'; text: string } => part.type === 'text')
+      .map((part) => part.text)
+      .join('');
+  };
+
   return (
     <div className="flex flex-col h-full">
       {/* Messages */}
@@ -30,7 +38,7 @@ export function ChatInterface() {
                   : 'bg-zinc-100 text-zinc-900'
               }`}
             >
-              <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+              <p className="text-sm whitespace-pre-wrap">{getMessageText(message)}</p>
             </div>
           </div>
         ))}

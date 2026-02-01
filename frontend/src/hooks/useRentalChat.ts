@@ -1,14 +1,22 @@
-import { useChat } from 'ai/react';
+'use client';
+
+import { useChat } from '@ai-sdk/react';
+import { DefaultChatTransport } from 'ai';
 import { useState, useEffect } from 'react';
 import type { RentalConfig } from '@/lib/ai/schemas';
 
 export function useRentalChat() {
   const [config, setConfig] = useState<Partial<RentalConfig>>({});
   const [isExtracting, setIsExtracting] = useState(false);
+  const [input, setInput] = useState('');
 
-  const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
-    api: '/api/chat',
+  const { messages, sendMessage, status } = useChat({
+    transport: new DefaultChatTransport({
+      api: '/api/chat',
+    }),
   });
+
+  const isLoading = status !== 'ready';
 
   // Auto-extract config after each AI response
   useEffect(() => {
@@ -37,6 +45,18 @@ export function useRentalChat() {
       console.error('Failed to extract config:', error);
     } finally {
       setIsExtracting(false);
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInput(e.target.value);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (input.trim()) {
+      sendMessage({ text: input });
+      setInput('');
     }
   };
 

@@ -1,6 +1,7 @@
 import { createPublicClient, http } from 'viem';
 import { base, baseSepolia } from 'viem/chains';
-import { RECURRING_RENT_ABI, RENTAL_FACTORY_ABI, FACTORY_ADDRESS } from './abis';
+import { RECURRING_RENT_ABI, RENTAL_FACTORY_ABI } from './abis';
+import { FACTORY_ADDRESS } from './constants';
 
 // Contract state enum matching Solidity
 export enum ContractState {
