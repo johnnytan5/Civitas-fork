@@ -154,6 +154,22 @@ forge script script/Deploy.s.sol --rpc-url base --broadcast --verify
 - `hooks/useRentalChat.ts`: Chat state + auto-extraction
 - `hooks/useContractDeploy.ts`: Deployment orchestration
 
+## 📚 Technical Documentation Reference
+**Read these files for detailed syntax and API context when working on specific features:**
+
+### ENS (Ethereum Name Service)
+*Context: `contracts/src/*`, `lib/ens/*`, BASENAME integration*
+- **[Smart Contracts](docs/tech/ens/ens-smart-contract.md)**: Core contract architecture, resolution process, registries.
+- **[General Docs](docs/tech/ens/ens-docs.md)**: High-level overview.
+> **Rule**: Uses `IENS` interface. Always normalize names before hashing.
+
+### LI.FI (Bridging & Swapping)
+*Context: `components/deploy/LiFiBridgeStep.tsx`, `lib/lifi/*`*
+- **[API Reference](docs/tech/li.fi/lifi-api.md)**: Endpoints, authentication, error codes.
+- **[SDK Guide](docs/tech/li.fi/lifi-sdk.md)**: Client-side SDK usage.
+> **Rule**: Never expose `x-lifi-api-key` on client side. Handle `INSUFFICIENT_LIQUIDITY` errors.
+
+
 ## Environment Variables
 
 Required in `.env.local`:
