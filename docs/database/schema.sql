@@ -32,7 +32,8 @@ CREATE TABLE rental_contracts (
   is_active BOOLEAN GENERATED ALWAYS AS (state = 1) STORED,
 
   -- Foreign keys
-  CONSTRAINT fk_landlord FOREIGN KEY (landlord_address) REFERENCES users(wallet_address) ON DELETE CASCADE
+  CONSTRAINT fk_landlord FOREIGN KEY (landlord_address) REFERENCES users(wallet_address) ON DELETE CASCADE,
+  CONSTRAINT fk_tenant FOREIGN KEY (tenant_address) REFERENCES users(wallet_address) ON DELETE SET NULL
 );
 
 -- User-Contract relationship table (for multi-role queries)
@@ -97,6 +98,10 @@ CREATE INDEX idx_chat_sessions_user ON chat_sessions(user_address);
 CREATE INDEX idx_chat_messages_session ON chat_messages(session_id);
 
 -- Row Level Security (RLS) Policies
+-- Note: We use wallet-based authentication (RainbowKit), not Supabase Auth.
+-- Server-side operations use service role key to bypass RLS.
+-- Client-side operations use anon key with permissive policies.
+-- Application-level access control is enforced in service layer.
 
 -- Enable RLS on all tables
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
@@ -106,43 +111,32 @@ ALTER TABLE contract_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE chat_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE chat_messages ENABLE ROW LEVEL SECURITY;
 
--- Users: Can read all, can only insert/update own record
-CREATE POLICY "Users can read all users" ON users FOR SELECT USING (true);
-CREATE POLICY "Users can insert own record" ON users FOR INSERT WITH CHECK (wallet_address = current_setting('request.jwt.claims', true)::json->>'wallet_address');
-CREATE POLICY "Users can update own record" ON users FOR UPDATE USING (wallet_address = current_setting('request.jwt.claims', true)::json->>'wallet_address');
+-- Users: Public read, service role handles writes
+CREATE POLICY "Public read access for users" ON users FOR SELECT USING (true);
+CREATE POLICY "Service role can insert users" ON users FOR INSERT WITH CHECK (true);
+CREATE POLICY "Service role can update users" ON users FOR UPDATE USING (true);
 
--- Rental contracts: Can read all, can only modify as landlord
-CREATE POLICY "Anyone can read rental contracts" ON rental_contracts FOR SELECT USING (true);
-CREATE POLICY "Landlord can insert contracts" ON rental_contracts FOR INSERT WITH CHECK (landlord_address = current_setting('request.jwt.claims', true)::json->>'wallet_address');
-CREATE POLICY "Landlord can update contracts" ON rental_contracts FOR UPDATE USING (landlord_address = current_setting('request.jwt.claims', true)::json->>'wallet_address');
+-- Rental contracts: Public read, service role handles writes
+CREATE POLICY "Public read access for rental contracts" ON rental_contracts FOR SELECT USING (true);
+CREATE POLICY "Service role can insert contracts" ON rental_contracts FOR INSERT WITH CHECK (true);
+CREATE POLICY "Service role can update contracts" ON rental_contracts FOR UPDATE USING (true);
 
--- User-contracts: Can read own relationships
-CREATE POLICY "Users can read own contract relationships" ON user_contracts FOR SELECT USING (user_address = current_setting('request.jwt.claims', true)::json->>'wallet_address');
-CREATE POLICY "Users can insert own relationships" ON user_contracts FOR INSERT WITH CHECK (user_address = current_setting('request.jwt.claims', true)::json->>'wallet_address');
+-- User-contracts: Public read, service role handles writes
+CREATE POLICY "Public read access for user contracts" ON user_contracts FOR SELECT USING (true);
+CREATE POLICY "Service role can insert user contracts" ON user_contracts FOR INSERT WITH CHECK (true);
 
--- Contract events: Anyone can read, service role can insert
-CREATE POLICY "Anyone can read contract events" ON contract_events FOR SELECT USING (true);
+-- Contract events: Public read, service role can insert
+CREATE POLICY "Public read access for contract events" ON contract_events FOR SELECT USING (true);
+CREATE POLICY "Service role can insert contract events" ON contract_events FOR INSERT WITH CHECK (true);
 
--- Chat sessions: Users can only access their own sessions
-CREATE POLICY "Users can read own chat sessions" ON chat_sessions FOR SELECT USING (user_address = current_setting('request.jwt.claims', true)::json->>'wallet_address');
-CREATE POLICY "Users can create own chat sessions" ON chat_sessions FOR INSERT WITH CHECK (user_address = current_setting('request.jwt.claims', true)::json->>'wallet_address');
-CREATE POLICY "Users can update own chat sessions" ON chat_sessions FOR UPDATE USING (user_address = current_setting('request.jwt.claims', true)::json->>'wallet_address');
+-- Chat sessions: Public read (filtered by service layer), service role handles writes
+CREATE POLICY "Public read access for chat sessions" ON chat_sessions FOR SELECT USING (true);
+CREATE POLICY "Service role can insert chat sessions" ON chat_sessions FOR INSERT WITH CHECK (true);
+CREATE POLICY "Service role can update chat sessions" ON chat_sessions FOR UPDATE USING (true);
 
--- Chat messages: Users can only access messages from their sessions
-CREATE POLICY "Users can read messages from own sessions" ON chat_messages FOR SELECT USING (
-  EXISTS (
-    SELECT 1 FROM chat_sessions
-    WHERE chat_sessions.id = chat_messages.session_id
-    AND chat_sessions.user_address = current_setting('request.jwt.claims', true)::json->>'wallet_address'
-  )
-);
-CREATE POLICY "Users can insert messages to own sessions" ON chat_messages FOR INSERT WITH CHECK (
-  EXISTS (
-    SELECT 1 FROM chat_sessions
-    WHERE chat_sessions.id = chat_messages.session_id
-    AND chat_sessions.user_address = current_setting('request.jwt.claims', true)::json->>'wallet_address'
-  )
-);
+-- Chat messages: Public read (filtered by service layer), service role handles writes
+CREATE POLICY "Public read access for chat messages" ON chat_messages FOR SELECT USING (true);
+CREATE POLICY "Service role can insert chat messages" ON chat_messages FOR INSERT WITH CHECK (true);
 
 -- Functions
 

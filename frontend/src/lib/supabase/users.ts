@@ -1,4 +1,4 @@
-import { createClient } from './server'
+import { createServiceClient } from './server'
 import type { Database } from './types'
 
 type User = Database['public']['Tables']['users']['Row']
@@ -9,7 +9,7 @@ type UserUpdate = Database['public']['Tables']['users']['Update']
  * Get or create user by wallet address
  */
 export async function getOrCreateUser(walletAddress: string, ensName?: string): Promise<User> {
-  const supabase = await createClient()
+  const supabase = createServiceClient()
 
   // Try to fetch existing user
   const { data: existingUser } = await supabase
@@ -21,12 +21,23 @@ export async function getOrCreateUser(walletAddress: string, ensName?: string): 
   if (existingUser) {
     // Update ENS name if provided and different
     if (ensName && existingUser.ens_name !== ensName) {
-      const { data: updatedUser } = await supabase
+      const { data: updatedUser, error } = await supabase
         .from('users')
         .update({ ens_name: ensName })
         .eq('wallet_address', walletAddress)
         .select()
         .single()
+
+      if (error) {
+        console.error('Supabase error updating user ENS name:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+        })
+        // Return existing user if update fails
+        return existingUser
+      }
 
       return updatedUser || existingUser
     }
@@ -44,8 +55,13 @@ export async function getOrCreateUser(walletAddress: string, ensName?: string): 
     .single()
 
   if (error) {
-    console.error('Error creating user:', error)
-    throw new Error('Failed to create user')
+    console.error('Supabase error creating user:', {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    })
+    throw new Error(`Failed to create user: ${error.message}`, { cause: error })
   }
 
   return newUser
@@ -55,7 +71,7 @@ export async function getOrCreateUser(walletAddress: string, ensName?: string): 
  * Update user ENS name
  */
 export async function updateUserEnsName(walletAddress: string, ensName: string): Promise<User> {
-  const supabase = await createClient()
+  const supabase = createServiceClient()
 
   const { data, error } = await supabase
     .from('users')
@@ -65,8 +81,13 @@ export async function updateUserEnsName(walletAddress: string, ensName: string):
     .single()
 
   if (error) {
-    console.error('Error updating user ENS name:', error)
-    throw new Error('Failed to update user')
+    console.error('Supabase error updating user ENS name:', {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    })
+    throw new Error(`Failed to update user: ${error.message}`, { cause: error })
   }
 
   return data
@@ -76,7 +97,7 @@ export async function updateUserEnsName(walletAddress: string, ensName: string):
  * Get user by wallet address
  */
 export async function getUserByAddress(walletAddress: string): Promise<User | null> {
-  const supabase = await createClient()
+  const supabase = createServiceClient()
 
   const { data, error } = await supabase
     .from('users')
@@ -85,7 +106,12 @@ export async function getUserByAddress(walletAddress: string): Promise<User | nu
     .single()
 
   if (error) {
-    console.error('Error fetching user:', error)
+    console.error('Supabase error fetching user:', {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    })
     return null
   }
 
@@ -100,7 +126,7 @@ export async function createUserContractRelation(
   contractAddress: string,
   role: 'landlord' | 'tenant'
 ): Promise<void> {
-  const supabase = await createClient()
+  const supabase = createServiceClient()
 
   const { error } = await supabase
     .from('user_contracts')
@@ -111,7 +137,12 @@ export async function createUserContractRelation(
     })
 
   if (error) {
-    console.error('Error creating user-contract relation:', error)
-    throw new Error('Failed to create relationship')
+    console.error('Supabase error creating user-contract relation:', {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    })
+    throw new Error(`Failed to create relationship: ${error.message}`, { cause: error })
   }
 }

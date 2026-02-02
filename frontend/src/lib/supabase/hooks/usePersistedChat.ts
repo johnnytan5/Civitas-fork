@@ -2,24 +2,25 @@
 
 import { useEffect, useState } from 'react'
 import { useChat } from '@ai-sdk/react'
+import { DefaultChatTransport } from 'ai'
 import { createClient } from '../client'
-import { addChatMessage, createChatSession } from '../chat'
+import { createChatSession } from '../chat'
 
+/**
+ * TODO: Re-enable chat persistence after fixing AI SDK v3 message type compatibility
+ * The UIMessage type structure has changed and needs investigation
+ */
 export function usePersistedChat(userAddress: string | undefined) {
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
 
   const chat = useChat({
-    api: '/api/chat',
-    onFinish: async (message) => {
-      // Persist assistant message to Supabase
-      if (sessionId) {
-        await addChatMessage(sessionId, 'assistant', message.content)
-      }
-    },
+    transport: new DefaultChatTransport({
+      api: '/api/chat',
+    }),
   })
 
-  // Initialize or restore chat session
+  // Initialize chat session
   useEffect(() => {
     if (!userAddress) return
 
@@ -30,8 +31,6 @@ export function usePersistedChat(userAddress: string | undefined) {
         // Create new session
         const session = await createChatSession(userAddress)
         setSessionId(session.id)
-
-        // TODO: Optionally restore last session instead of always creating new one
       } catch (error) {
         console.error('Failed to initialize chat session:', error)
       } finally {
@@ -42,15 +41,9 @@ export function usePersistedChat(userAddress: string | undefined) {
     initSession()
   }, [userAddress])
 
-  // Persist user messages
-  const sendMessage = async (content: string) => {
-    if (sessionId) {
-      // Persist user message to Supabase
-      await addChatMessage(sessionId, 'user', content)
-    }
-
-    // Send to AI
-    chat.append({ role: 'user', content })
+  // Custom send message wrapper
+  const sendMessage = (content: string) => {
+    chat.sendMessage({ text: content })
   }
 
   return {

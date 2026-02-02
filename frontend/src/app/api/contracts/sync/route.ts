@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch fresh data from blockchain
-    const [landlord, tenant, monthlyAmount, totalMonths, startTimestamp, state, terminationInitiatedAt] =
+    const [landlord, tenant, monthlyAmount, totalMonths, startTime, state, terminationNoticeTime] =
       await Promise.all([
         publicClient.readContract({
           address: contractAddress,
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
         publicClient.readContract({
           address: contractAddress,
           abi: RECURRING_RENT_ABI,
-          functionName: 'startTimestamp',
+          functionName: 'startTime',
         }),
         publicClient.readContract({
           address: contractAddress,
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
         publicClient.readContract({
           address: contractAddress,
           abi: RECURRING_RENT_ABI,
-          functionName: 'terminationInitiatedAt',
+          functionName: 'terminationNoticeTime',
         }),
       ])
 
@@ -66,9 +66,9 @@ export async function POST(request: NextRequest) {
       tenant,
       monthlyAmount,
       totalMonths,
-      startTimestamp,
+      startTimestamp: startTime,
       state,
-      terminationInitiatedAt,
+      terminationInitiatedAt: terminationNoticeTime,
     })
 
     return NextResponse.json({ contract: updated })

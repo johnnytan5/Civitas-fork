@@ -1,4 +1,4 @@
-import { createClient } from './server'
+import { createServiceClient } from './server'
 import type { Database } from './types'
 
 type ChatSession = Database['public']['Tables']['chat_sessions']['Row']
@@ -9,7 +9,7 @@ type ChatMessageInsert = Database['public']['Tables']['chat_messages']['Insert']
  * Create a new chat session
  */
 export async function createChatSession(userAddress: string): Promise<ChatSession> {
-  const supabase = await createClient()
+  const supabase = createServiceClient()
 
   const { data, error } = await supabase
     .from('chat_sessions')
@@ -18,8 +18,13 @@ export async function createChatSession(userAddress: string): Promise<ChatSessio
     .single()
 
   if (error) {
-    console.error('Error creating chat session:', error)
-    throw new Error('Failed to create chat session')
+    console.error('Supabase error creating chat session:', {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    })
+    throw new Error(`Failed to create chat session: ${error.message}`, { cause: error })
   }
 
   return data
@@ -32,7 +37,7 @@ export async function linkSessionToContract(
   sessionId: string,
   contractAddress: string
 ): Promise<ChatSession> {
-  const supabase = await createClient()
+  const supabase = createServiceClient()
 
   const { data, error } = await supabase
     .from('chat_sessions')
@@ -42,8 +47,13 @@ export async function linkSessionToContract(
     .single()
 
   if (error) {
-    console.error('Error linking session to contract:', error)
-    throw new Error('Failed to link session')
+    console.error('Supabase error linking session to contract:', {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    })
+    throw new Error(`Failed to link session: ${error.message}`, { cause: error })
   }
 
   return data
@@ -53,7 +63,7 @@ export async function linkSessionToContract(
  * Get chat session by ID
  */
 export async function getChatSession(sessionId: string): Promise<ChatSession | null> {
-  const supabase = await createClient()
+  const supabase = createServiceClient()
 
   const { data, error } = await supabase
     .from('chat_sessions')
@@ -62,7 +72,12 @@ export async function getChatSession(sessionId: string): Promise<ChatSession | n
     .single()
 
   if (error) {
-    console.error('Error fetching chat session:', error)
+    console.error('Supabase error fetching chat session:', {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    })
     return null
   }
 
@@ -73,7 +88,7 @@ export async function getChatSession(sessionId: string): Promise<ChatSession | n
  * Get all chat sessions for a user
  */
 export async function getUserChatSessions(userAddress: string): Promise<ChatSession[]> {
-  const supabase = await createClient()
+  const supabase = createServiceClient()
 
   const { data, error } = await supabase
     .from('chat_sessions')
@@ -82,8 +97,13 @@ export async function getUserChatSessions(userAddress: string): Promise<ChatSess
     .order('created_at', { ascending: false })
 
   if (error) {
-    console.error('Error fetching user chat sessions:', error)
-    throw new Error('Failed to fetch chat sessions')
+    console.error('Supabase error fetching user chat sessions:', {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    })
+    throw new Error(`Failed to fetch chat sessions: ${error.message}`, { cause: error })
   }
 
   return data || []
@@ -97,7 +117,7 @@ export async function addChatMessage(
   role: 'user' | 'assistant' | 'system',
   content: string
 ): Promise<ChatMessage> {
-  const supabase = await createClient()
+  const supabase = createServiceClient()
 
   const { data, error } = await supabase
     .from('chat_messages')
@@ -110,8 +130,13 @@ export async function addChatMessage(
     .single()
 
   if (error) {
-    console.error('Error adding chat message:', error)
-    throw new Error('Failed to add message')
+    console.error('Supabase error adding chat message:', {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    })
+    throw new Error(`Failed to add message: ${error.message}`, { cause: error })
   }
 
   return data
@@ -121,7 +146,7 @@ export async function addChatMessage(
  * Get all messages for a chat session
  */
 export async function getSessionMessages(sessionId: string): Promise<ChatMessage[]> {
-  const supabase = await createClient()
+  const supabase = createServiceClient()
 
   const { data, error } = await supabase
     .from('chat_messages')
@@ -130,8 +155,13 @@ export async function getSessionMessages(sessionId: string): Promise<ChatMessage
     .order('created_at', { ascending: true })
 
   if (error) {
-    console.error('Error fetching session messages:', error)
-    throw new Error('Failed to fetch messages')
+    console.error('Supabase error fetching session messages:', {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    })
+    throw new Error(`Failed to fetch messages: ${error.message}`, { cause: error })
   }
 
   return data || []
@@ -141,7 +171,7 @@ export async function getSessionMessages(sessionId: string): Promise<ChatMessage
  * Bulk insert messages for a chat session
  */
 export async function addChatMessages(messages: ChatMessageInsert[]): Promise<ChatMessage[]> {
-  const supabase = await createClient()
+  const supabase = createServiceClient()
 
   const { data, error } = await supabase
     .from('chat_messages')
@@ -149,8 +179,13 @@ export async function addChatMessages(messages: ChatMessageInsert[]): Promise<Ch
     .select()
 
   if (error) {
-    console.error('Error adding chat messages:', error)
-    throw new Error('Failed to add messages')
+    console.error('Supabase error adding chat messages:', {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    })
+    throw new Error(`Failed to add messages: ${error.message}`, { cause: error })
   }
 
   return data || []
