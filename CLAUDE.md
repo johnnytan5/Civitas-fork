@@ -16,6 +16,7 @@ Civitas is an AI-powered cross-chain rental agreement platform built for ETH Hac
 - **Smart Contracts**: Solidity 0.8.20, Foundry
 - **Cross-Chain**: LI.FI Widget
 - **Identity**: Basenames (ENS on Base)
+- **Database**: Supabase (PostgreSQL 17, Row Level Security)
 
 ## Architecture
 
