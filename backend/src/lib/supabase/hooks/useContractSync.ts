@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { syncContract as syncContractAPI } from '@/lib/api/backend'
 
 export function useContractSync() {
   const [isSyncing, setIsSyncing] = useState(false)
@@ -12,8 +11,18 @@ export function useContractSync() {
     setError(null)
 
     try {
-      const result = await syncContractAPI(contractAddress)
-      return result.contract
+      const response = await fetch('/api/contracts/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contractAddress }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Sync failed')
+      }
+
+      const data = await response.json()
+      return data.contract
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error'
       setError(message)
