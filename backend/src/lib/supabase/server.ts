@@ -1,33 +1,18 @@
-import { createServerClient } from '@supabase/ssr'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
-import { cookies } from 'next/headers'
 import type { Database } from './types'
 
 /**
- * Creates a Supabase client for Server Components and API Routes
- * Uses anon key with cookie-based session management
+ * Creates a Supabase client for backend usage with anon key.
+ * No Next.js cookies/session handling in Express runtime.
  */
 export async function createClient() {
-  const cookieStore = await cookies()
-
-  return createServerClient<Database>(
+  return createSupabaseClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll()
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) => {
-              cookieStore.set(name, value, options)
-            })
-          } catch (error) {
-            // Server component: cookies can only be read
-            // Middleware will handle session refresh
-          }
-        },
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
       },
     }
   )

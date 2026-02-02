@@ -1,4 +1,4 @@
-import { getUserContracts, updateContract } from './contracts'
+import { updateContract } from './contracts'
 import { getOrCreateUser } from './users'
 import type { Database } from './types'
 
