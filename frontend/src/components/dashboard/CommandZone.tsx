@@ -1,8 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import type { RentalContract } from '@/lib/contracts/fetch-contracts';
-import { DashboardContractCard } from './DashboardContractCard';
 import { GenericContractCard } from './GenericContractCard';
 import { Send } from 'lucide-react';
 import type { ContractTemplate } from '@/lib/contracts/constants';
@@ -95,29 +93,11 @@ export default function CommandZone({
               </span>
             </div>
 
-            {/* Rental Contracts Section */}
-            {rentalContracts.length > 0 && (
-              <div className="mb-6">
-                <h3 className="font-display font-bold text-xs uppercase tracking-wider text-gray-600 mb-3 px-2">
-                  🏠 Rental Agreements ({rentalContracts.length})
-                </h3>
-                <div className="grid grid-cols-1 gap-4">
-                  {rentalContracts.map((contract) => (
-                    <DashboardContractCard
-                      key={contract.address}
-                      contract={contract}
-                      onClick={() => onSelectContract(contract)}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Generic Contracts Section */}
+            {/* Contracts Section */}
             {genericContracts.length > 0 && (
               <div>
                 <h3 className="font-display font-bold text-xs uppercase tracking-wider text-gray-600 mb-3 px-2">
-                  ⚡ Smart Contract Templates ({genericContracts.length})
+                  ⚡ Contracts ({genericContracts.length})
                 </h3>
                 <div className="grid grid-cols-1 gap-4">
                   {genericContracts.map((contract) => (

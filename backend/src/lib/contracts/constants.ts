@@ -10,13 +10,6 @@ export const USDC_ADDRESS = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913' as cons
 
 export const USDC_DECIMALS = 6;
 
-// Contract addresses (will be set after deployment)
-export const FACTORY_ADDRESS = (process.env.NEXT_PUBLIC_FACTORY_ADDRESS ||
-  '0x0000000000000000000000000000000000000000') as `0x${string}`;
-
-export const RENTAL_IMPLEMENTATION = (process.env.NEXT_PUBLIC_RENTAL_IMPLEMENTATION ||
-  '0x0000000000000000000000000000000000000000') as `0x${string}`;
-
 // CivitasFactory (multi-template)
 export const CIVITAS_FACTORY_ADDRESS = (process.env.CIVITAS_FACTORY_ADDRESS ||
   '0x0000000000000000000000000000000000000000') as `0x${string}`;

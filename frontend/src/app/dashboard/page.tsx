@@ -3,14 +3,13 @@
 import { useState, useEffect } from 'react';
 import { useAccount } from 'wagmi';
 import { WalletGate } from '@/components/wallet/WalletGate';
-import { fetchUserContracts, type RentalContract } from '@/lib/contracts/fetch-contracts';
 import NavigationRail from '@/components/layout/NavigationRail';
 import MarqueeTicker from '@/components/layout/MarqueeTicker';
 import CommandZone from '@/components/dashboard/CommandZone';
 import ExecutionZoneRouter from '@/components/dashboard/ExecutionZoneRouter';
 import NetworkSwitcher from '@/components/wallet/NetworkSwitcher';
 
-// Generic contract type from database
+// Contract type from database
 interface GenericContract {
   id: string;
   contract_address: string;
@@ -26,13 +25,11 @@ interface GenericContract {
   last_synced_at: string | null;
 }
 
-// Union type for all contracts
-export type AllContracts = RentalContract | GenericContract;
+export type AllContracts = GenericContract;
 
 export default function DashboardPage() {
   const { address } = useAccount();
-  const [rentalContracts, setRentalContracts] = useState<RentalContract[]>([]);
-  const [genericContracts, setGenericContracts] = useState<GenericContract[]>([]);
+  const [contracts, setContracts] = useState<GenericContract[]>([]);
   const [selectedContract, setSelectedContract] = useState<AllContracts | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -46,15 +43,11 @@ export default function DashboardPage() {
     try {
       setSyncing(true);
 
-      // Fetch rental contracts (from blockchain)
-      const rentalData = await fetchUserContracts(address).catch(() => []);
-      setRentalContracts(rentalData);
-
-      // Fetch generic contracts (from database)
+      // Fetch contracts from database
       const response = await fetch(`/api/contracts/user/${address}`);
       if (response.ok) {
         const data = await response.json();
-        setGenericContracts(data.contracts || []);
+        setContracts(data.contracts || []);
       }
     } catch (error) {
       console.error('Failed to sync contracts:', error);
@@ -63,7 +56,7 @@ export default function DashboardPage() {
     }
   };
 
-  // Fetch both rental and generic contracts on mount
+  // Fetch contracts on mount
   useEffect(() => {
     async function loadContracts() {
       if (!address) {
@@ -74,20 +67,17 @@ export default function DashboardPage() {
       try {
         setLoading(true);
 
-        // Fetch rental contracts (from blockchain)
-        const rentalData = await fetchUserContracts(address).catch(() => []);
-        setRentalContracts(rentalData);
-
-        // Fetch generic contracts (from database)
+        // Fetch contracts from database
         const response = await fetch(`/api/contracts/user/${address}`);
         if (response.ok) {
           const data = await response.json();
-          setGenericContracts(data.contracts || []);
-        }
-
-        // Auto-select first contract
-        if (rentalData.length > 0) {
-          setSelectedContract(rentalData[0]);
+          const fetchedContracts = data.contracts || [];
+          setContracts(fetchedContracts);
+          
+          // Auto-select first contract
+          if (fetchedContracts.length > 0) {
+            setSelectedContract(fetchedContracts[0]);
+          }
         }
       } catch (error) {
         console.error('Failed to fetch contracts:', error);
@@ -100,14 +90,11 @@ export default function DashboardPage() {
   }, [address]);
 
   // Filter contracts based on selected filters
-  let filteredContracts = [...rentalContracts, ...genericContracts];
+  let filteredContracts = [...contracts];
 
   if (templateFilter !== 'all') {
     filteredContracts = filteredContracts.filter((contract) => {
-      if ('template_id' in contract) {
-        return contract.template_id === templateFilter;
-      }
-      return false; // Rental contracts don't have template_id
+      return contract.template_id === templateFilter;
     });
   }
 
@@ -209,8 +196,8 @@ export default function DashboardPage() {
           <div className="flex-grow flex flex-col md:flex-row h-full overflow-hidden">
             {/* Command Zone */}
             <CommandZone
-              rentalContracts={rentalContracts.filter((c) => filteredContracts.includes(c))}
-              genericContracts={genericContracts.filter((c) => filteredContracts.includes(c))}
+              rentalContracts={[]}
+              genericContracts={filteredContracts}
               onSelectContract={setSelectedContract}
               selectedContract={selectedContract}
               loading={loading}

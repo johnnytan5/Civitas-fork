@@ -124,11 +124,14 @@ forge script script/Deploy.s.sol --rpc-url base --broadcast --verify
 ## Important File Locations
 
 ### Smart Contracts (`contracts/`)
-- `src/RecurringRent.sol`: Implementation contract with FSM logic
-- `src/RentalFactory.sol`: CREATE2 factory with basename registration
-- `test/RecurringRent.t.sol`: RecurringRent tests
-- `test/RentalFactory.t.sol`: Factory and CREATE2 tests
-- `script/Deploy.s.sol`: Deployment script
+- `src/CivitasFactory.sol`: Multi-template CREATE2 factory
+- `src/RentVault.sol`: Enhanced rental agreement implementation
+- `src/GroupBuyEscrow.sol`: Group purchase escrow implementation
+- `src/StableAllowanceTreasury.sol`: Allowance-based treasury implementation
+- `test/CivitasFactory.t.sol`: Factory tests
+- `test/RentVault.t.sol`, `test/GroupBuyEscrow.t.sol`, etc: Template tests
+- `script/DeployCivitasFactory.s.sol`: Deployment script
+- `archive/`: Legacy rental contracts (deprecated Feb 2026)
 
 ### Frontend
 - `app/create/page.tsx`: Split-screen chat + preview interface
@@ -186,8 +189,7 @@ NEXT_PUBLIC_BASE_RPC_URL=https://mainnet.base.org
 NEXT_PUBLIC_MAINNET_RPC_URL=https://eth.llamarpc.com
 
 # Contracts (after deployment)
-NEXT_PUBLIC_FACTORY_ADDRESS=0x...
-NEXT_PUBLIC_RENTAL_IMPLEMENTATION=0x...
+CIVITAS_FACTORY_ADDRESS=0x...
 ```
 
 Required in `contracts/.env`:
@@ -199,12 +201,12 @@ BASESCAN_API_KEY=your_basescan_api_key
 
 ## Contract States
 
-RecurringRent.sol has 5 states:
-- **Deployed (0)**: Contract exists but not funded (Ghost 🔴)
-- **Active (1)**: Fully funded, rent releasing (Active 🟢)
-- **Completed (2)**: All rent paid, term finished (Completed ✅)
-- **TerminationPending (3)**: Landlord initiated termination, 30-day notice (Terminating 🟣)
-- **Terminated (4)**: Early termination finalized (Terminated ⚫)
+Contracts use integer state codes that vary by template. Common states:
+- **0 (Deployed)**: Contract created but not yet active
+- **1 (Active)**: Fully funded and operational
+- **2+ (Various)**: Template-specific completion/terminal states
+
+See template-specific documentation for detailed state machines.
 
 ## Key Constants
 

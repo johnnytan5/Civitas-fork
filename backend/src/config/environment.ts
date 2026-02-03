@@ -9,7 +9,6 @@ interface Environment {
   PORT: number
   FRONTEND_URL: string
   BASE_RPC_URL: string
-  FACTORY_ADDRESS: `0x${string}`
   CIVITAS_FACTORY_ADDRESS: `0x${string}`
   NEXT_PUBLIC_SUPABASE_URL: string
   NEXT_PUBLIC_SUPABASE_ANON_KEY: string
@@ -20,7 +19,6 @@ interface Environment {
 function validateEnv(): Environment {
   const required = [
     'BASE_RPC_URL',
-    'FACTORY_ADDRESS',
     'CIVITAS_FACTORY_ADDRESS',
     'NEXT_PUBLIC_SUPABASE_URL',
     'NEXT_PUBLIC_SUPABASE_ANON_KEY',
@@ -38,7 +36,6 @@ function validateEnv(): Environment {
     PORT: parseInt(process.env.PORT || '3001', 10),
     FRONTEND_URL: process.env.FRONTEND_URL || 'http://localhost:3000',
     BASE_RPC_URL: process.env.BASE_RPC_URL!,
-    FACTORY_ADDRESS: process.env.FACTORY_ADDRESS as `0x${string}`,
     CIVITAS_FACTORY_ADDRESS: process.env.CIVITAS_FACTORY_ADDRESS as `0x${string}`,
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL!,
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,

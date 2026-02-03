@@ -1,6 +1,5 @@
 import { publicClient } from '@/config/blockchain'
 import { env } from '@/config/environment'
-import { handleContractDeployed } from './handlers/contractDeployed'
 import { handleRentVaultCreated } from './handlers/rentVaultCreated'
 import { handleGroupBuyEscrowCreated } from './handlers/groupBuyEscrowCreated'
 import { handleTreasuryCreated } from './handlers/treasuryCreated'
@@ -8,73 +7,6 @@ import { logger } from '@/utils/logger'
 
 const POLL_INTERVAL_MS = 10_000
 const LOOKBACK_BLOCKS = 2n
-
-/**
- * Start legacy RentalFactory event listener using log polling.
- */
-async function startLegacyFactoryListener() {
-  try {
-    let lastProcessedBlock = await publicClient.getBlockNumber()
-
-    if (lastProcessedBlock > LOOKBACK_BLOCKS) {
-      lastProcessedBlock -= LOOKBACK_BLOCKS
-    }
-
-    logger.info('Legacy factory event listener started (polling)', {
-      fromBlock: lastProcessedBlock,
-    })
-
-    setInterval(async () => {
-      try {
-        const latestBlock = await publicClient.getBlockNumber()
-
-        if (latestBlock <= lastProcessedBlock) {
-          return
-        }
-
-        const fromBlock = lastProcessedBlock + 1n
-        const toBlock = latestBlock
-
-        const logs = await publicClient.getLogs({
-          address: env.FACTORY_ADDRESS,
-          event: {
-            type: 'event' as const,
-            name: 'RentalDeployed',
-            inputs: [
-              { name: 'creator', type: 'address', indexed: true },
-              { name: 'rental', type: 'address', indexed: true },
-              { name: 'landlord', type: 'address', indexed: true },
-              { name: 'tenant', type: 'address', indexed: false },
-              { name: 'suggestedName', type: 'string', indexed: false },
-            ],
-          },
-          fromBlock,
-          toBlock,
-        })
-
-        if (logs.length > 0) {
-          await Promise.allSettled(
-            logs.map((log) =>
-              handleContractDeployed(log).catch((error) => {
-                logger.error('Error handling RentalDeployed event', {
-                  error,
-                  log,
-                })
-              })
-            )
-          )
-        }
-
-        lastProcessedBlock = latestBlock
-      } catch (error) {
-        logger.error('Event listener poll error - RentalDeployed', { error })
-      }
-    }, POLL_INTERVAL_MS)
-  } catch (error) {
-    logger.error('Failed to initialize legacy event listener', { error })
-    throw error
-  }
-}
 
 /**
  * Start CivitasFactory event listener.
@@ -184,6 +116,5 @@ async function startCivitasFactoryListener() {
 }
 
 export function startEventListeners() {
-  startLegacyFactoryListener()
   startCivitasFactoryListener()
 }

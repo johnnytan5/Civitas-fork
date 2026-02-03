@@ -2,19 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import { useAccount } from 'wagmi';
+import { base, baseSepolia } from 'wagmi/chains';
 import AppLayout from '@/components/layout/AppLayout';
 import NetworkModeToggle from '@/components/settings/NetworkModeToggle';
 import SettingRow from '@/components/settings/SettingRow';
 import SettingsSection from '@/components/settings/SettingsSection';
 import { useUserSettings } from '@/hooks/useUserSettings';
+import { CIVITAS_FACTORY_ADDRESS } from '@/lib/contracts/constants';
 import { ExternalLink, RefreshCw } from 'lucide-react';
 
 type SettingsCategory = 'network' | 'display' | 'about';
-
-const FACTORY_ADDRESSES = {
-  mainnet: process.env.NEXT_PUBLIC_FACTORY_ADDRESS || '0x...',
-  testnet: '0x...', // TODO: Add testnet factory address
-};
 
 export default function SettingsPage() {
   const { address, isConnected } = useAccount();
@@ -235,17 +232,17 @@ export default function SettingsPage() {
 
               <SettingsSection title="Smart Contracts">
                 <SettingRow
-                  label="Factory Address"
+                  label="CivitasFactory Address"
                   control={
                     <div className="flex items-center gap-2">
                       <code className="font-mono text-xs break-all">
-                        {FACTORY_ADDRESSES[settings?.network_mode || 'testnet']}
+                        {CIVITAS_FACTORY_ADDRESS[settings?.network_mode === 'mainnet' ? base.id : baseSepolia.id]}
                       </code>
                       <a
                         href={`${settings?.network_mode === 'mainnet'
                           ? 'https://basescan.org'
                           : 'https://sepolia.basescan.org'
-                          }/address/${FACTORY_ADDRESSES[settings?.network_mode || 'testnet']}`}
+                          }/address/${CIVITAS_FACTORY_ADDRESS[settings?.network_mode === 'mainnet' ? base.id : baseSepolia.id]}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="p-2 bg-acid-lime border-2 border-black hover:bg-hot-pink transition-colors cursor-pointer shrink-0"

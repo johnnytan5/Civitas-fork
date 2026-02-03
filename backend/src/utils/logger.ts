@@ -14,7 +14,10 @@ class Logger {
       ...context,
     }
 
-    console.log(JSON.stringify(logEntry))
+    // Custom JSON serializer to handle BigInt values
+    console.log(JSON.stringify(logEntry, (_key, value) =>
+      typeof value === 'bigint' ? value.toString() : value
+    ))
   }
 
   info(message: string, context?: LogContext) {

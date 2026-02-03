@@ -80,16 +80,6 @@ export const CHAIN_CONFIG = {
 } as const;
 
 // ============================================================================
-// Deprecated (Old RentalFactory - for backwards compatibility)
-// ============================================================================
-
-// @deprecated Use CIVITAS_FACTORY_ADDRESS instead
-export const FACTORY_ADDRESS = CIVITAS_FACTORY_ADDRESS[baseSepolia.id];
-
-// @deprecated Use RENT_VAULT_IMPL instead
-export const RENTAL_IMPLEMENTATION = RENT_VAULT_IMPL[baseSepolia.id];
-
-// ============================================================================
 // Convenience Exports
 // ============================================================================
 

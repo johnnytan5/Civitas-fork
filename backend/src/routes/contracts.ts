@@ -1,5 +1,4 @@
 import { Router, Request, Response } from 'express'
-import { syncContract } from '@/services/blockchain/sync'
 import { syncGenericContract } from '@/services/blockchain/sync'
 import {
   createGenericContract,
@@ -13,24 +12,6 @@ import { logger } from '@/utils/logger'
 import type { Address } from 'viem'
 
 const router: Router = Router()
-
-/**
- * POST /api/contracts/sync
- * Legacy: Manually trigger rental contract sync from blockchain to Supabase
- */
-router.post('/sync', asyncHandler(async (req: Request, res: Response) => {
-  const { contractAddress } = req.body
-
-  if (!contractAddress) {
-    throw new ValidationError('Contract address required')
-  }
-
-  logger.info('Manual contract sync requested', { contractAddress })
-
-  const contract = await syncContract(contractAddress as Address)
-
-  res.json({ contract })
-}))
 
 /**
  * POST /api/contracts

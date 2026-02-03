@@ -2,13 +2,25 @@ import { useState, useEffect } from 'react';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt, useChainId, usePublicClient } from 'wagmi';
 import { CIVITAS_FACTORY_ADDRESS, CONTRACT_TEMPLATES, type ContractTemplate } from '@/lib/contracts/constants';
 import { CIVITAS_FACTORY_ABI } from '@/lib/contracts/abis';
-import {
-  persistPendingDeployment,
-  clearPendingDeployment,
-  storeContractInDatabase,
-  type PendingDeployment,
-} from '@/lib/contracts/recovery';
 import { decodeEventLog } from 'viem';
+
+// Simple localStorage-based recovery
+interface PendingDeployment {
+  templateId: string;
+  params: any;
+  txHash: string;
+  timestamp: number;
+}
+
+const PENDING_KEY = 'civitas_pending_deployment';
+
+function persistPendingDeployment(data: PendingDeployment) {
+  localStorage.setItem(PENDING_KEY, JSON.stringify(data));
+}
+
+function clearPendingDeployment() {
+  localStorage.removeItem(PENDING_KEY);
+}
 
 export interface RentVaultParams {
   recipient: `0x${string}`;
