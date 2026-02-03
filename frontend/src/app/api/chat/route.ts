@@ -1,17 +1,38 @@
-import { streamText, convertToModelMessages, type UIMessage } from 'ai';
+import { streamText } from 'ai';
 import { google } from '@ai-sdk/google';
-import { RENTAL_ASSISTANT_PROMPT } from '@/lib/ai/prompts';
+import { getTemplatePrompt } from '@/lib/ai/prompts';
 
 export const runtime = 'edge';
 
 export async function POST(req: Request) {
-  const { messages }: { messages: UIMessage[] } = await req.json();
+  try {
+    const body = await req.json();
+    const { messages, templateId } = body;
 
-  const result = streamText({
-    model: google('gemini-3-flash-preview'),
-    system: RENTAL_ASSISTANT_PROMPT,
-    messages: await convertToModelMessages(messages),
-  });
+    // Validate messages
+    if (!messages || !Array.isArray(messages)) {
+      return new Response(JSON.stringify({ error: 'Invalid messages format' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
 
-  return result.toUIMessageStreamResponse();
+    // Get the appropriate system prompt based on template
+    const systemPrompt = getTemplatePrompt(templateId || null);
+
+    // Pass messages directly - the AI SDK handles conversion internally
+    const result = streamText({
+      model: google('gemini-2.5-flash'),
+      system: systemPrompt,
+      messages: messages as any,
+    });
+
+    return result.toUIMessageStreamResponse();
+  } catch (error) {
+    console.error('Chat API error:', error);
+    return new Response(JSON.stringify({ error: String(error) }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
 }

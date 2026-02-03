@@ -11,27 +11,37 @@ export function ChatBubble({ role, message, timestamp }: ChatBubbleProps) {
 
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-6`}>
-      <div
-        className={`relative max-w-[75%] px-6 py-4 border-[3px] border-black ${
-          isUser
-            ? 'bg-hot-pink ml-auto bubble-tip-right shadow-[3px_3px_0px_#000]'
-            : 'bg-stark-white mr-auto bubble-tip-left shadow-[3px_3px_0px_#000]'
-        }`}
-      >
-        <p
-          className={`whitespace-pre-wrap leading-relaxed ${
-            isUser 
-              ? 'text-base font-black text-black' 
-              : 'text-base font-display text-black font-medium'
+      <div className="relative">
+        {/* Chat bubble container */}
+        <div
+          className={`max-w-[75%] px-6 py-4 border-[3px] border-black ${
+            isUser
+              ? 'bg-hot-pink shadow-[3px_3px_0px_#000]'
+              : 'bg-stark-white shadow-[3px_3px_0px_#000]'
           }`}
         >
-          {message}
-        </p>
-        {timestamp && (
-          <span className="block mt-2 text-xs font-display text-black opacity-60 uppercase tracking-wide">
-            {timestamp}
-          </span>
-        )}
+          <p
+            className={`whitespace-pre-wrap leading-relaxed ${
+              isUser 
+                ? 'text-base font-black text-black' 
+                : 'text-base font-display text-black font-medium'
+            }`}
+          >
+            {message}
+          </p>
+          {timestamp && (
+            <span className="block mt-2 text-xs font-display text-black opacity-60 uppercase tracking-wide">
+              {timestamp}
+            </span>
+          )}
+        </div>
+        
+        {/* Notch triangle - positioned absolutely */}
+        <div
+          className={`absolute ${
+            isUser ? 'bubble-tip-right' : 'bubble-tip-left'
+          }`}
+        />
       </div>
     </div>
   );

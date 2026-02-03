@@ -119,7 +119,7 @@ It should be obvious how ENS improves your product and is not just implemented a
 |-------|------------|-----------|
 | Frontend | Next.js 15 + App Router | RSC for performance, streaming support |
 | Wallet | RainbowKit v2 + wagmi v2 + viem | Industry standard, `getDefaultConfig` API |
-| AI | Gemini 3 Flash (`gemini-3-flash-preview`) | Fast, cheap ($0.50/1M input), structured output |
+| AI | Gemini 3 Flash (`gemini-2.5-flash`) | Fast, cheap ($0.50/1M input), structured output |
 | AI SDK | Vercel AI SDK (`@ai-sdk/google`) | Streaming, Zod schema support |
 | Contracts | Foundry + Solidity 0.8.20 | Best testing, CREATE2 support |
 | Cross-chain | LI.FI Widget + SDK | 60+ chains, automatic routing |
@@ -423,9 +423,9 @@ export function LiFiBridgeStep({
 
 | Component | Model | Cost |
 |-----------|-------|------|
-| Chat streaming | `gemini-3-flash-preview` | $0.50/1M input |
-| Config extraction | `gemini-3-flash-preview` | $3.00/1M output |
-| Name generation | `gemini-3-flash-preview` | $3.00/1M output |
+| Chat streaming | `gemini-2.5-flash` | $0.50/1M input |
+| Config extraction | `gemini-2.5-flash` | $3.00/1M output |
+| Name generation | `gemini-2.5-flash` | $3.00/1M output |
 
 ### 6.2 Schemas (Zod)
 
@@ -457,7 +457,7 @@ export async function POST(req: Request) {
   const { messages } = await req.json();
 
   const result = streamText({
-    model: google('gemini-3-flash-preview'),
+    model: google('gemini-2.5-flash'),
     system: RENTAL_ASSISTANT_PROMPT,
     messages,
   });

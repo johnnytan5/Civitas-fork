@@ -916,7 +916,7 @@ export async function POST(req: Request) {
     const { messages } = await req.json();
 
     const result = streamText({
-      model: google('gemini-3-flash-preview'),
+      model: google('gemini-2.5-flash'),
       system: RENTAL_ASSISTANT_PROMPT,
       messages,
       temperature: 0.7,
@@ -944,7 +944,7 @@ export async function POST(req: Request) {
     const { messages } = await req.json();
 
     const { object } = await generateObject({
-      model: google('gemini-3-flash-preview'),
+      model: google('gemini-2.5-flash'),
       schema: RentalConfigSchema,
       system: CONFIG_EXTRACTION_PROMPT,
       messages,
@@ -972,7 +972,7 @@ export async function POST(req: Request) {
     const { config } = await req.json();
 
     const { object } = await generateObject({
-      model: google('gemini-3-flash-preview'),
+      model: google('gemini-2.5-flash'),
       schema: NameSuggestionSchema,
       system: NAME_GENERATION_PROMPT,
       prompt: `Generate a subdomain name for this rental:

@@ -1,49 +1,315 @@
 'use client';
 
+import { useState } from 'react';
 import { WalletGate } from '@/components/wallet/WalletGate';
-import { ChatInterface } from '@/components/chat/ChatInterface';
-import { ContractCard } from '@/components/contract/ContractCard';
-import { useRentalChat } from '@/hooks/useRentalChat';
+import { useTemplateChat } from '@/hooks/useTemplateChat';
+import { useCivitasContractDeploy } from '@/hooks/useCivitasContractDeploy';
+import { templateRegistry } from '@/lib/templates/registry';
+import { TemplateSelector } from '@/components/chat/TemplateSelector';
+import { ContractReceiptCard } from '@/components/contract/ContractReceiptCard';
+import { StatusBanner } from '@/components/ui/StatusBanner';
+import { ChatBubble } from '@/components/chat/ChatBubble';
+import { TerminalInput } from '@/components/ui/TerminalInput';
+import { LoadingSquares } from '@/components/ui/LoadingSquares';
 import NavigationRail from '@/components/layout/NavigationRail';
 import MarqueeTicker from '@/components/layout/MarqueeTicker';
+import { transformConfigToDeployParams, validateConfig } from '@/lib/contracts/config-transformer';
+import { CONTRACT_TEMPLATES, type ContractTemplate } from '@/lib/contracts/constants';
 
 export default function CreatePage() {
-  const { config, isConfigComplete } = useRentalChat();
+  const {
+    messages,
+    input,
+    handleInputChange,
+    handleSubmit,
+    isLoading,
+    detectedTemplate,
+    activeTemplate,
+    handleTemplateSelect,
+    extractedConfig,
+    configCompleteness,
+    isConfigComplete,
+    getMessageText,
+  } = useTemplateChat();
+
+  const {
+    deployContract,
+    isPending,
+    isConfirming,
+    isSuccess,
+    deployedAddress,
+    error: deployError,
+  } = useCivitasContractDeploy();
+
+  const [deploymentError, setDeploymentError] = useState<string | null>(null);
+
+  const allTemplates = templateRegistry.getAll();
+
+  const onSubmit = () => {
+    handleSubmit(new Event('submit') as any);
+  };
+
+  const handleDeploy = async () => {
+    if (!activeTemplate || !extractedConfig) {
+      return;
+    }
+
+    // Validate config
+    const validationError = validateConfig(activeTemplate.id, extractedConfig);
+    if (validationError) {
+      setDeploymentError(validationError);
+      return;
+    }
+
+    try {
+      setDeploymentError(null);
+
+      // Transform config to deployment params
+      const params = transformConfigToDeployParams(activeTemplate.id, extractedConfig);
+
+      // Map template ID to CONTRACT_TEMPLATES constant
+      let templateConstant: ContractTemplate;
+      switch (activeTemplate.id) {
+        case 'rent-vault':
+          templateConstant = CONTRACT_TEMPLATES.RENT_VAULT;
+          break;
+        case 'group-buy-escrow':
+          templateConstant = CONTRACT_TEMPLATES.GROUP_BUY_ESCROW;
+          break;
+        case 'stable-allowance-treasury':
+          templateConstant = CONTRACT_TEMPLATES.STABLE_ALLOWANCE_TREASURY;
+          break;
+        default:
+          throw new Error(`Unknown template: ${activeTemplate.id}`);
+      }
+
+      // Deploy contract
+      await deployContract(templateConstant, params);
+    } catch (error: any) {
+      console.error('Deployment error:', error);
+      setDeploymentError(error.message || 'Failed to deploy contract');
+    }
+  };
+
+  const isDeploying = isPending || isConfirming;
 
   return (
     <WalletGate
       fallbackTitle="Connect to Create"
-      fallbackMessage="Connect your wallet to start creating rental agreements with AI"
+      fallbackMessage="Connect your wallet to start creating agreements with AI"
     >
-      <div className="min-h-screen bg-paper-cream relative">
-        {/* Navigation Rail */}
+      <div className="min-h-screen h-screen overflow-hidden bg-[#FAF9F6]">
+        {/* Zone A: Navigation Rail (Left - 88px) */}
         <NavigationRail />
 
-        {/* Main Content */}
-        <div className="min-h-screen ml-[88px] flex flex-col">
+        {/* Main Content Area - offset by nav rail width */}
+        <div className="ml-[88px] h-full flex">
+          {/* Zone B: Command Center (Center - 45% of remaining space) */}
+          <div className="w-[45%] flex flex-col bg-white border-r-[3px] border-black">
           {/* Marquee Ticker */}
           <MarqueeTicker />
 
-          {/* Page Header */}
-          <div className="p-8 pb-4">
-            <div className="inline-block bg-acid-lime border-[3px] border-black px-6 py-3 shadow-[4px_4px_0px_#000]">
-              <h1 className="font-headline text-2xl uppercase tracking-wide text-black">CREATE AGREEMENT</h1>
+          {/* Template Selector (if no template selected) */}
+          {!activeTemplate && (
+            <>
+              <div className="flex-1 overflow-y-auto">
+                {/* Show messages if there's a conversation */}
+                {messages.length > 0 && (
+                  <div className="p-8 border-b-[3px] border-black pattern-grid">
+                  {messages.map((message) => {
+                    const extractedText = getMessageText(message);
+                    return (
+                      <div key={message.id} className="relative z-10">
+                        <ChatBubble
+                          role={message.role === 'user' ? 'user' : 'agent'}
+                          message={extractedText}
+                        />
+                      </div>
+                    );
+                  })}
+                    
+                    {isLoading && (
+                      <div className="flex justify-start mb-6 relative z-10">
+                        <div className="bg-stark-white border-[3px] border-black px-6 py-5 shadow-[3px_3px_0px_#000]">
+                          <LoadingSquares size="md" />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {/* Template Selector */}
+                <TemplateSelector
+                  templates={allTemplates}
+                  onSelect={handleTemplateSelect}
+                  detectedTemplate={detectedTemplate}
+                />
+              </div>
+              
+              {/* Input Area - Always visible for AI detection */}
+              <div className="border-t-[3px] border-black p-4 bg-paper-cream shrink-0">
+                <TerminalInput
+                  value={input}
+                  onChange={handleInputChange}
+                  onSubmit={onSubmit}
+                  placeholder="Describe what you want to create..."
+                  disabled={isLoading}
+                />
+              </div>
+            </>
+          )}
+
+          {/* Chat Interface (if template selected) */}
+          {activeTemplate && (
+            <div className="flex-1 flex flex-col overflow-hidden">
+              {/* Chat Header */}
+              <div className="bg-warning-yellow border-b-[3px] border-black px-6 py-3 shrink-0">
+                <div className="flex items-center justify-between">
+                  <h2 className="font-headline text-xl uppercase tracking-wide text-black">
+                    {activeTemplate.name}
+                  </h2>
+                  <button
+                    onClick={() => handleTemplateSelect('')}
+                    className="font-mono text-sm underline hover:no-underline"
+                  >
+                    Change Template
+                  </button>
+                </div>
+              </div>
+
+              {/* Messages Area */}
+              <div className="flex-1 overflow-y-auto p-8 relative pattern-grid">
+                {messages.length === 0 && (
+                  <div className="bg-white border-[3px] border-black shadow-[4px_4px_0px_#000] mx-auto max-w-lg mt-12 p-8">
+                    <div className="text-center space-y-4">
+                      <h3 className="font-headline text-3xl uppercase text-black leading-tight">
+                        LET&apos;S BUILD
+                      </h3>
+                      <p className="font-display text-base text-black leading-relaxed">
+                        Tell me about your {activeTemplate.name.toLowerCase()} and I&apos;ll help you create it on-chain.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {messages.map((message) => {
+                  const extractedText = getMessageText(message);
+                  return (
+                    <div key={message.id} className="relative z-10">
+                      <ChatBubble
+                        role={message.role === 'user' ? 'user' : 'agent'}
+                        message={extractedText}
+                      />
+                    </div>
+                  );
+                })}
+
+                {isLoading && (
+                  <div className="flex justify-start mb-6 relative z-10">
+                    <div className="bg-stark-white border-[3px] border-black px-6 py-5 shadow-[3px_3px_0px_#000]">
+                      <LoadingSquares size="md" />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Input Area */}
+              <div className="border-t-[3px] border-black p-4 bg-paper-cream shrink-0">
+                <TerminalInput
+                  value={input}
+                  onChange={handleInputChange}
+                  onSubmit={onSubmit}
+                  placeholder="Describe your agreement..."
+                  disabled={isLoading}
+                />
+              </div>
             </div>
+          )}
           </div>
 
-          {/* Split Screen Layout */}
-          <div className="flex-1 px-8 pb-8">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-full">
-              {/* Left: Chat Interface */}
-              <div className="h-full min-h-[600px]">
-                <ChatInterface />
-              </div>
+          {/* Zone C: Execution Deck (Right - Remaining 55%) */}
+          <div
+            className="flex-1 overflow-y-auto p-8"
+            style={{
+              backgroundImage:
+                'radial-gradient(circle, #000 1px, transparent 1px)',
+              backgroundSize: '20px 20px',
+              backgroundPosition: '0 0',
+              opacity: 0.95,
+            }}
+          >
+          {activeTemplate && extractedConfig && (
+            <>
+              <ContractReceiptCard
+                template={activeTemplate}
+                config={extractedConfig}
+                onDeploy={handleDeploy}
+                isDeploying={isDeploying}
+              />
 
-              {/* Right: Contract Preview */}
-              <div className="lg:sticky lg:top-8 h-fit">
-                <ContractCard config={config} isComplete={isConfigComplete} />
+              {/* Deployment Status Messages */}
+              {deploymentError && (
+                <div className="mt-4">
+                  <StatusBanner variant="error" onDismiss={() => setDeploymentError(null)}>
+                    {deploymentError}
+                  </StatusBanner>
+                </div>
+              )}
+
+              {deployError && (
+                <div className="mt-4">
+                  <StatusBanner variant="error">
+                    Transaction failed: {deployError.message}
+                  </StatusBanner>
+                </div>
+              )}
+
+              {isPending && (
+                <div className="mt-4">
+                  <StatusBanner variant="warning">
+                    Waiting for wallet confirmation...
+                  </StatusBanner>
+                </div>
+              )}
+
+              {isConfirming && (
+                <div className="mt-4">
+                  <StatusBanner variant="info">
+                    Transaction submitted! Waiting for confirmation...
+                  </StatusBanner>
+                </div>
+              )}
+
+              {isSuccess && deployedAddress && (
+                <div className="mt-4">
+                  <StatusBanner variant="success">
+                    Contract deployed at {deployedAddress.slice(0, 10)}...{deployedAddress.slice(-8)}
+                  </StatusBanner>
+                </div>
+              )}
+            </>
+          )}
+
+          {!activeTemplate && (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center">
+                <div className="font-black text-4xl uppercase mb-4 opacity-20">
+                  /// STANDBY ///
+                </div>
+                <p className="font-mono text-sm opacity-40">
+                  SELECT TEMPLATE TO BEGIN
+                </p>
               </div>
             </div>
+          )}
+
+          {activeTemplate && !extractedConfig && (
+            <div className="flex items-center justify-center h-full">
+              <StatusBanner variant="info">
+                Start chatting to configure your {activeTemplate.name.toLowerCase()}
+              </StatusBanner>
+            </div>
+          )}
           </div>
         </div>
       </div>

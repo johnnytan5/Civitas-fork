@@ -20,7 +20,7 @@ export function TerminalInput({
 }: TerminalInputProps) {
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    if (!disabled && value.trim()) {
+    if (!disabled && value?.trim()) {
       onSubmit();
     }
   };
@@ -51,7 +51,7 @@ export function TerminalInput({
       {/* Submit Button */}
       <button
         type="submit"
-        disabled={disabled || !value.trim()}
+        disabled={disabled || !value?.trim()}
         className="bg-acid-lime px-7 border-l-[3px] border-black hover:bg-warning-yellow transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
       >
         <Send className="w-6 h-6 text-black" strokeWidth={3} />

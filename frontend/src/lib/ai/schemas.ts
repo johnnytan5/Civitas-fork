@@ -1,5 +1,8 @@
 import { z } from 'zod';
 
+// ============================================
+// Legacy Rental Schema (keep for backward compatibility)
+// ============================================
 export const RentalConfigSchema = z.object({
   tenant: z.string().describe('ENS name or Ethereum address'),
   monthlyAmount: z.number().positive().describe('Monthly rent in USDC'),
@@ -10,6 +13,77 @@ export const RentalConfigSchema = z.object({
 
 export type RentalConfig = z.infer<typeof RentalConfigSchema>;
 
+// ============================================
+// Multi-Template Schemas
+// ============================================
+
+// Rent Vault: Multi-tenant rent collection
+export const RentVaultConfigSchema = z.object({
+  recipient: z.string()
+    .regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid recipient address')
+    .optional()
+    .describe('Landlord/recipient Ethereum address'),
+  rentAmount: z.string()
+    .optional()
+    .describe('Total rent amount in USDC (will be converted to 6 decimals)'),
+  dueDate: z.string()
+    .optional()
+    .describe('Due date for rent payment (ISO date string or timestamp)'),
+  tenants: z.array(z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid tenant address'))
+    .optional()
+    .describe('Array of tenant Ethereum addresses'),
+  shareBps: z.array(z.number().int().positive())
+    .optional()
+    .describe('Share basis points per tenant (must sum to 10000)'),
+});
+
+export type RentVaultConfig = z.infer<typeof RentVaultConfigSchema>;
+
+// Group Buy Escrow: Group purchase with voting
+export const GroupBuyEscrowConfigSchema = z.object({
+  recipient: z.string()
+    .regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid recipient address')
+    .optional()
+    .describe('Seller/recipient Ethereum address'),
+  fundingGoal: z.string()
+    .optional()
+    .describe('Total funding goal in USDC'),
+  expiryDate: z.string()
+    .optional()
+    .describe('Funding expiry date (ISO date string or timestamp)'),
+  timelockRefundDelay: z.string()
+    .optional()
+    .describe('Delay in seconds after goal reached before timelock refund is available'),
+  participants: z.array(z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid participant address'))
+    .optional()
+    .describe('Array of participant Ethereum addresses'),
+  shareBps: z.array(z.number().int().positive())
+    .optional()
+    .describe('Share basis points per participant (must sum to 10000)'),
+});
+
+export type GroupBuyEscrowConfig = z.infer<typeof GroupBuyEscrowConfigSchema>;
+
+// Stable Allowance Treasury: Counter-based allowance
+export const StableAllowanceTreasuryConfigSchema = z.object({
+  owner: z.string()
+    .regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid owner address')
+    .optional()
+    .describe('Owner/controller Ethereum address (e.g., parent)'),
+  recipient: z.string()
+    .regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid recipient address')
+    .optional()
+    .describe('Recipient Ethereum address (e.g., child)'),
+  allowancePerIncrement: z.string()
+    .optional()
+    .describe('Fixed USDC amount per claim'),
+});
+
+export type StableAllowanceTreasuryConfig = z.infer<typeof StableAllowanceTreasuryConfigSchema>;
+
+// ============================================
+// Basename Generation
+// ============================================
 export const NameSuggestionSchema = z.object({
   suggestedName: z.string().max(20).describe('Semantic subdomain name (lowercase, hyphenated)'),
   reasoning: z.string().optional().describe('Why this name was chosen'),

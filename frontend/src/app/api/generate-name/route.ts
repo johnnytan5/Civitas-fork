@@ -25,7 +25,7 @@ ${conversationContext ? `Additional Context:\n${conversationContext}` : ''}
 Generate a memorable, semantic subdomain name.`;
 
     const { object } = await generateObject({
-      model: google('gemini-3-flash-preview'),
+      model: google('gemini-2.5-flash'),
       schema: NameSuggestionSchema,
       prompt,
     });

@@ -36,6 +36,8 @@ export default function DashboardPage() {
   const [selectedContract, setSelectedContract] = useState<AllContracts | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [templateFilter, setTemplateFilter] = useState<string>('all');
+  const [stateFilter, setStateFilter] = useState<number | 'all'>('all');
 
   // Function to refresh contracts (can be called manually)
   const syncContracts = async () => {
@@ -97,8 +99,23 @@ export default function DashboardPage() {
     loadContracts();
   }, [address]);
 
-  // Combine all contracts for the list
-  const allContracts = [...rentalContracts, ...genericContracts];
+  // Filter contracts based on selected filters
+  let filteredContracts = [...rentalContracts, ...genericContracts];
+
+  if (templateFilter !== 'all') {
+    filteredContracts = filteredContracts.filter((contract) => {
+      if ('template_id' in contract) {
+        return contract.template_id === templateFilter;
+      }
+      return false; // Rental contracts don't have template_id
+    });
+  }
+
+  if (stateFilter !== 'all') {
+    filteredContracts = filteredContracts.filter((contract) => {
+      return contract.state === stateFilter;
+    });
+  }
 
   return (
     <WalletGate
@@ -152,12 +169,48 @@ export default function DashboardPage() {
           {/* Marquee Ticker */}
           <MarqueeTicker />
 
+          {/* Filters Bar */}
+          <div className="bg-white border-b-[3px] border-black p-4 flex gap-4 items-center">
+            <span className="font-mono text-xs font-bold uppercase">Filters:</span>
+            
+            {/* Template Filter */}
+            <select
+              value={templateFilter}
+              onChange={(e) => setTemplateFilter(e.target.value)}
+              className="font-mono text-sm border-[2px] border-black px-3 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-[#CCFF00]"
+            >
+              <option value="all">All Templates</option>
+              <option value="rent-vault">Rent Vault</option>
+              <option value="group-buy-escrow">Group Buy Escrow</option>
+              <option value="stable-allowance-treasury">Allowance Treasury</option>
+            </select>
+
+            {/* State Filter */}
+            <select
+              value={stateFilter}
+              onChange={(e) => setStateFilter(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
+              className="font-mono text-sm border-[2px] border-black px-3 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-[#CCFF00]"
+            >
+              <option value="all">All States</option>
+              <option value="0">Deployed</option>
+              <option value="1">Active</option>
+              <option value="2">Completed</option>
+              <option value="3">Terminating</option>
+              <option value="4">Terminated</option>
+            </select>
+
+            {/* Result Count */}
+            <div className="ml-auto bg-black text-[#CCFF00] px-3 py-1 border-2 border-[#CCFF00] font-mono text-sm font-bold">
+              {filteredContracts.length} CONTRACTS
+            </div>
+          </div>
+
           {/* Three-Zone Layout */}
           <div className="flex-grow flex flex-col md:flex-row h-full overflow-hidden">
             {/* Command Zone */}
             <CommandZone
-              rentalContracts={rentalContracts}
-              genericContracts={genericContracts}
+              rentalContracts={rentalContracts.filter((c) => filteredContracts.includes(c))}
+              genericContracts={genericContracts.filter((c) => filteredContracts.includes(c))}
               onSelectContract={setSelectedContract}
               selectedContract={selectedContract}
               loading={loading}
