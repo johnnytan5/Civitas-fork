@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Archivo_Black, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { Web3Provider } from "@/components/providers/Web3Provider";
+import { NetworkModeProvider } from "@/contexts/NetworkModeContext";
 
 const archivoBlack = Archivo_Black({
   weight: "400",
@@ -29,7 +30,9 @@ export default function RootLayout({
       <body
         className={`${archivoBlack.variable} ${spaceGrotesk.variable} antialiased`}
       >
-        <Web3Provider>{children}</Web3Provider>
+        <NetworkModeProvider>
+          <Web3Provider>{children}</Web3Provider>
+        </NetworkModeProvider>
       </body>
     </html>
   );

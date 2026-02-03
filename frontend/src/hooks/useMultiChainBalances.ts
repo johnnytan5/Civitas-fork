@@ -3,64 +3,137 @@
 import { useBalance, useBlockNumber } from 'wagmi';
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { NetworkMode, NETWORK_CONFIG } from '@/lib/config/networks';
 
 interface ChainBalances {
   eth: ReturnType<typeof useBalance>;
   usdc: ReturnType<typeof useBalance>;
 }
 
-export function useMultiChainBalances(address: `0x${string}` | undefined) {
+interface MultiChainBalances {
+  mainnet: {
+    base: ChainBalances;
+    ethereum: ChainBalances;
+  };
+  testnet: {
+    baseSepolia: ChainBalances;
+  };
+  activeNetwork: NetworkMode;
+  isLoading: boolean;
+  hasError: boolean;
+}
+
+export function useMultiChainBalances(
+  address: `0x${string}` | undefined,
+  networkMode: NetworkMode = 'testnet'
+): MultiChainBalances {
   const queryClient = useQueryClient();
 
-  // Base chain balances
-  const baseEth = useBalance({
+  // ===== MAINNET BALANCES =====
+
+  // Base Mainnet
+  const baseMainnetEth = useBalance({
     address,
-    chainId: 8453, // Base mainnet
+    chainId: NETWORK_CONFIG.mainnet.base.chainId,
+    query: { enabled: networkMode === 'mainnet' && !!address },
   });
 
-  const baseUsdc = useBalance({
+  const baseMainnetUsdc = useBalance({
     address,
-    chainId: 8453,
-    token: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', // Base USDC
+    chainId: NETWORK_CONFIG.mainnet.base.chainId,
+    token: NETWORK_CONFIG.mainnet.base.usdc as `0x${string}`,
+    query: { enabled: networkMode === 'mainnet' && !!address },
   });
 
-  // Ethereum mainnet balance
+  // Ethereum Mainnet
   const ethMainnetEth = useBalance({
     address,
-    chainId: 1, // Ethereum mainnet
+    chainId: NETWORK_CONFIG.mainnet.ethereum.chainId,
+    query: { enabled: networkMode === 'mainnet' && !!address },
   });
 
   const ethMainnetUsdc = useBalance({
     address,
-    chainId: 1,
-    token: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', // Ethereum USDC
+    chainId: NETWORK_CONFIG.mainnet.ethereum.chainId,
+    token: NETWORK_CONFIG.mainnet.ethereum.usdc as `0x${string}`,
+    query: { enabled: networkMode === 'mainnet' && !!address },
   });
 
-  // Auto-refresh on new blocks (Base chain)
-  const { data: blockNumber } = useBlockNumber({
-    chainId: 8453,
-    watch: true
+  // ===== TESTNET BALANCES =====
+
+  // Base Sepolia
+  const baseSepoliaEth = useBalance({
+    address,
+    chainId: NETWORK_CONFIG.testnet.baseSepolia.chainId,
+    query: { enabled: networkMode === 'testnet' && !!address },
   });
 
+  const baseSepoliaUsdc = useBalance({
+    address,
+    chainId: NETWORK_CONFIG.testnet.baseSepolia.chainId,
+    token: NETWORK_CONFIG.testnet.baseSepolia.usdc as `0x${string}`,
+    query: { enabled: networkMode === 'testnet' && !!address },
+  });
+
+  // ===== AUTO-REFRESH ON NEW BLOCKS =====
+
+  // Watch mainnet blocks
+  const { data: baseMainnetBlock } = useBlockNumber({
+    chainId: NETWORK_CONFIG.mainnet.base.chainId,
+    watch: networkMode === 'mainnet',
+  });
+
+  // Watch testnet blocks
+  const { data: baseSepoliaBlock } = useBlockNumber({
+    chainId: NETWORK_CONFIG.testnet.baseSepolia.chainId,
+    watch: networkMode === 'testnet',
+  });
+
+  // Invalidate mainnet queries on new blocks
   useEffect(() => {
-    if (blockNumber) {
-      queryClient.invalidateQueries({ queryKey: baseEth.queryKey });
-      queryClient.invalidateQueries({ queryKey: baseUsdc.queryKey });
+    if (baseMainnetBlock && networkMode === 'mainnet') {
+      queryClient.invalidateQueries({ queryKey: baseMainnetEth.queryKey });
+      queryClient.invalidateQueries({ queryKey: baseMainnetUsdc.queryKey });
     }
-  }, [blockNumber, queryClient, baseEth.queryKey, baseUsdc.queryKey]);
+  }, [baseMainnetBlock, networkMode, queryClient, baseMainnetEth.queryKey, baseMainnetUsdc.queryKey]);
 
-  const isLoading = baseEth.isLoading || baseUsdc.isLoading || ethMainnetEth.isLoading || ethMainnetUsdc.isLoading;
-  const hasError = baseEth.isError || baseUsdc.isError || ethMainnetEth.isError || ethMainnetUsdc.isError;
+  // Invalidate testnet queries on new blocks
+  useEffect(() => {
+    if (baseSepoliaBlock && networkMode === 'testnet') {
+      queryClient.invalidateQueries({ queryKey: baseSepoliaEth.queryKey });
+      queryClient.invalidateQueries({ queryKey: baseSepoliaUsdc.queryKey });
+    }
+  }, [baseSepoliaBlock, networkMode, queryClient, baseSepoliaEth.queryKey, baseSepoliaUsdc.queryKey]);
+
+  // Calculate loading and error states based on active network
+  const isLoading =
+    networkMode === 'mainnet'
+      ? baseMainnetEth.isLoading || baseMainnetUsdc.isLoading || ethMainnetEth.isLoading || ethMainnetUsdc.isLoading
+      : baseSepoliaEth.isLoading || baseSepoliaUsdc.isLoading;
+
+  const hasError =
+    networkMode === 'mainnet'
+      ? baseMainnetEth.isError || baseMainnetUsdc.isError || ethMainnetEth.isError || ethMainnetUsdc.isError
+      : baseSepoliaEth.isError || baseSepoliaUsdc.isError;
 
   return {
-    base: {
-      eth: baseEth,
-      usdc: baseUsdc,
+    mainnet: {
+      base: {
+        eth: baseMainnetEth,
+        usdc: baseMainnetUsdc,
+      },
+      ethereum: {
+        eth: ethMainnetEth,
+        usdc: ethMainnetUsdc,
+      },
     },
-    ethereum: {
-      eth: ethMainnetEth,
-      usdc: ethMainnetUsdc,
+    testnet: {
+      baseSepolia: {
+        eth: baseSepoliaEth,
+        usdc: baseSepoliaUsdc,
+      },
     },
+    activeNetwork: networkMode,
     isLoading,
     hasError,
   };

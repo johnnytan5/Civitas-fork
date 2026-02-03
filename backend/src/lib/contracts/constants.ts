@@ -17,6 +17,10 @@ export const FACTORY_ADDRESS = (process.env.NEXT_PUBLIC_FACTORY_ADDRESS ||
 export const RENTAL_IMPLEMENTATION = (process.env.NEXT_PUBLIC_RENTAL_IMPLEMENTATION ||
   '0x0000000000000000000000000000000000000000') as `0x${string}`;
 
+// CivitasFactory (multi-template)
+export const CIVITAS_FACTORY_ADDRESS = (process.env.CIVITAS_FACTORY_ADDRESS ||
+  '0x0000000000000000000000000000000000000000') as `0x${string}`;
+
 // Time constants
 export const MONTH_DURATION = 30 * 24 * 60 * 60; // 30 days in seconds
 export const MAX_DURATION_MONTHS = 60;

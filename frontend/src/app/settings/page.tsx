@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useAccount } from 'wagmi';
 import AppLayout from '@/components/layout/AppLayout';
-import NetworkToggle from '@/components/settings/NetworkToggle';
+import NetworkModeToggle from '@/components/settings/NetworkModeToggle';
 import SettingRow from '@/components/settings/SettingRow';
 import SettingsSection from '@/components/settings/SettingsSection';
 import { useUserSettings } from '@/hooks/useUserSettings';
@@ -84,11 +84,10 @@ export default function SettingsPage() {
               <button
                 key={category.id}
                 onClick={() => setActiveCategory(category.id as SettingsCategory)}
-                className={`w-full text-left px-4 py-3 border-2 border-black font-display font-bold uppercase text-sm transition-all duration-200 ${
-                  activeCategory === category.id
-                    ? 'bg-acid-lime text-black shadow-[4px_4px_0px_#000]'
-                    : 'bg-stark-white text-black hover:bg-paper-cream cursor-pointer hover:shadow-[2px_2px_0px_#000]'
-                }`}
+                className={`w-full text-left px-4 py-3 border-2 border-black font-display font-bold uppercase text-sm transition-all duration-200 ${activeCategory === category.id
+                  ? 'bg-acid-lime text-black shadow-[4px_4px_0px_#000]'
+                  : 'bg-stark-white text-black hover:bg-paper-cream cursor-pointer hover:shadow-[2px_2px_0px_#000]'
+                  }`}
               >
                 {category.label}
                 {category.important && ' ⚡'}
@@ -123,11 +122,7 @@ export default function SettingsPage() {
           {/* Network Settings */}
           {activeCategory === 'network' && (
             <>
-              <NetworkToggle
-                currentNetwork={settings?.network_mode || 'testnet'}
-                onToggle={handleNetworkToggle}
-                isLoading={isUpdating}
-              />
+              <NetworkModeToggle />
 
               {/* RPC Endpoints (Advanced) */}
               <SettingsSection title="RPC Endpoints (Advanced)">
@@ -247,11 +242,10 @@ export default function SettingsPage() {
                         {FACTORY_ADDRESSES[settings?.network_mode || 'testnet']}
                       </code>
                       <a
-                        href={`${
-                          settings?.network_mode === 'mainnet'
-                            ? 'https://basescan.org'
-                            : 'https://sepolia.basescan.org'
-                        }/address/${FACTORY_ADDRESSES[settings?.network_mode || 'testnet']}`}
+                        href={`${settings?.network_mode === 'mainnet'
+                          ? 'https://basescan.org'
+                          : 'https://sepolia.basescan.org'
+                          }/address/${FACTORY_ADDRESSES[settings?.network_mode || 'testnet']}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="p-2 bg-acid-lime border-2 border-black hover:bg-hot-pink transition-colors cursor-pointer shrink-0"

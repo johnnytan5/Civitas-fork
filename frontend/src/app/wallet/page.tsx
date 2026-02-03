@@ -8,6 +8,7 @@ import BalanceCard from '@/components/wallet/BalanceCard';
 import ChainSelector from '@/components/wallet/ChainSelector';
 import ContractSummaryCard from '@/components/wallet/ContractSummaryCard';
 import { useMultiChainBalances } from '@/hooks/useMultiChainBalances';
+import { useNetworkMode } from '@/contexts/NetworkModeContext';
 import Link from 'next/link';
 import { formatUnits } from 'viem';
 
@@ -20,8 +21,11 @@ const SUPPORTED_CHAINS = [
 
 export default function WalletPage() {
   const { address, isConnected } = useAccount();
-  const balances = useMultiChainBalances(address);
-  const [activeChain, setActiveChain] = useState(8453); // Base by default
+  const { networkMode } = useNetworkMode();
+  const balances = useMultiChainBalances(address, networkMode);
+  const [activeChain, setActiveChain] = useState(
+    networkMode === 'mainnet' ? 8453 : 84532
+  );
   const [contractStats, setContractStats] = useState({ activeCount: 0, totalLocked: '0.00' });
   const [statsLoading, setStatsLoading] = useState(true);
 
@@ -58,10 +62,11 @@ export default function WalletPage() {
           Wallet Overview
         </h2>
         <div className="flex gap-2 items-center">
-          <span className="text-xs font-display font-bold bg-void-black text-acid-lime px-2 py-1 border border-acid-lime">
-            {typeof window !== 'undefined' && localStorage.getItem('civitas_network_mode') === 'mainnet'
-              ? 'MAINNET'
-              : 'TESTNET'}
+          <span className={`text-xs font-display font-bold px-2 py-1 border-2 ${networkMode === 'mainnet'
+              ? 'bg-acid-lime text-black border-black'
+              : 'bg-hot-pink text-white border-black'
+            }`}>
+            {networkMode.toUpperCase()}
           </span>
         </div>
       </div>
@@ -147,48 +152,74 @@ export default function WalletPage() {
 
           {/* Balance Cards */}
           <div className="space-y-4">
-            {activeChain === 8453 && (
+            {networkMode === 'mainnet' ? (
               <>
-                <BalanceCard
-                  token="ETH"
-                  balance={balances.base.eth.data?.value}
-                  decimals={18}
-                  chainName="Base"
-                  isLoading={balances.base.eth.isLoading}
-                  isError={balances.base.eth.isError}
-                  error={balances.base.eth.error}
-                />
-                <BalanceCard
-                  token="USDC"
-                  balance={balances.base.usdc.data?.value}
-                  decimals={6}
-                  chainName="Base"
-                  isLoading={balances.base.usdc.isLoading}
-                  isError={balances.base.usdc.isError}
-                  error={balances.base.usdc.error}
-                />
-              </>
-            )}
+                {activeChain === 8453 && (
+                  <>
+                    <BalanceCard
+                      token="ETH"
+                      balance={balances.mainnet.base.eth.data?.value}
+                      decimals={18}
+                      chainName="Base"
+                      isLoading={balances.mainnet.base.eth.isLoading}
+                      isError={balances.mainnet.base.eth.isError}
+                      error={balances.mainnet.base.eth.error}
+                    />
+                    <BalanceCard
+                      token="USDC"
+                      balance={balances.mainnet.base.usdc.data?.value}
+                      decimals={6}
+                      chainName="Base"
+                      isLoading={balances.mainnet.base.usdc.isLoading}
+                      isError={balances.mainnet.base.usdc.isError}
+                      error={balances.mainnet.base.usdc.error}
+                    />
+                  </>
+                )}
 
-            {activeChain === 1 && (
+                {activeChain === 1 && (
+                  <>
+                    <BalanceCard
+                      token="ETH"
+                      balance={balances.mainnet.ethereum.eth.data?.value}
+                      decimals={18}
+                      chainName="Ethereum"
+                      isLoading={balances.mainnet.ethereum.eth.isLoading}
+                      isError={balances.mainnet.ethereum.eth.isError}
+                      error={balances.mainnet.ethereum.eth.error}
+                    />
+                    <BalanceCard
+                      token="USDC"
+                      balance={balances.mainnet.ethereum.usdc.data?.value}
+                      decimals={6}
+                      chainName="Ethereum"
+                      isLoading={balances.mainnet.ethereum.usdc.isLoading}
+                      isError={balances.mainnet.ethereum.usdc.isError}
+                      error={balances.mainnet.ethereum.usdc.error}
+                    />
+                  </>
+                )}
+              </>
+            ) : (
               <>
+                {/* Testnet - Base Sepolia */}
                 <BalanceCard
                   token="ETH"
-                  balance={balances.ethereum.eth.data?.value}
+                  balance={balances.testnet.baseSepolia.eth.data?.value}
                   decimals={18}
-                  chainName="Ethereum"
-                  isLoading={balances.ethereum.eth.isLoading}
-                  isError={balances.ethereum.eth.isError}
-                  error={balances.ethereum.eth.error}
+                  chainName="Base Sepolia"
+                  isLoading={balances.testnet.baseSepolia.eth.isLoading}
+                  isError={balances.testnet.baseSepolia.eth.isError}
+                  error={balances.testnet.baseSepolia.eth.error}
                 />
                 <BalanceCard
                   token="USDC"
-                  balance={balances.ethereum.usdc.data?.value}
+                  balance={balances.testnet.baseSepolia.usdc.data?.value}
                   decimals={6}
-                  chainName="Ethereum"
-                  isLoading={balances.ethereum.usdc.isLoading}
-                  isError={balances.ethereum.usdc.isError}
-                  error={balances.ethereum.usdc.error}
+                  chainName="Base Sepolia"
+                  isLoading={balances.testnet.baseSepolia.usdc.isLoading}
+                  isError={balances.testnet.baseSepolia.usdc.isError}
+                  error={balances.testnet.baseSepolia.usdc.error}
                 />
               </>
             )}

@@ -85,6 +85,51 @@ export type Database = {
           },
         ]
       }
+      contracts: {
+        Row: {
+          id: string
+          contract_address: string
+          template_id: string
+          creator_address: string
+          chain_id: number
+          state: number
+          basename: string | null
+          config: Json
+          on_chain_state: Json | null
+          created_at: string | null
+          updated_at: string | null
+          last_synced_at: string | null
+        }
+        Insert: {
+          id?: string
+          contract_address: string
+          template_id: string
+          creator_address: string
+          chain_id?: number
+          state?: number
+          basename?: string | null
+          config: Json
+          on_chain_state?: Json | null
+          created_at?: string | null
+          updated_at?: string | null
+          last_synced_at?: string | null
+        }
+        Update: {
+          id?: string
+          contract_address?: string
+          template_id?: string
+          creator_address?: string
+          chain_id?: number
+          state?: number
+          basename?: string | null
+          config?: Json
+          on_chain_state?: Json | null
+          created_at?: string | null
+          updated_at?: string | null
+          last_synced_at?: string | null
+        }
+        Relationships: []
+      }
       contract_events: {
         Row: {
           block_number: number

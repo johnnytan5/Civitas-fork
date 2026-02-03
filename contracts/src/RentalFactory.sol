@@ -19,7 +19,7 @@ contract RentalFactory is Ownable {
         string suggestedName
     );
 
-    constructor(address _implementation) Ownable(msg.sender) {
+    constructor(address _implementation) Ownable() {
         require(_implementation != address(0), "Invalid implementation");
         implementation = _implementation;
     }

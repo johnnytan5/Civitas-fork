@@ -1,7 +1,14 @@
 import { Router, Request, Response } from 'express'
 import { syncContract } from '@/services/blockchain/sync'
+import { syncGenericContract } from '@/services/blockchain/sync'
+import {
+  createGenericContract,
+  getUserContracts as getGenericUserContracts,
+  getContractByAddress as getGenericContractByAddress,
+} from '@/lib/supabase/generic-contracts'
+import { getTemplate } from '@/config/templates'
 import { asyncHandler } from '@/utils/asyncHandler'
-import { ValidationError } from '@/utils/errors'
+import { ValidationError, NotFoundError } from '@/utils/errors'
 import { logger } from '@/utils/logger'
 import type { Address } from 'viem'
 
@@ -9,7 +16,7 @@ const router: Router = Router()
 
 /**
  * POST /api/contracts/sync
- * Manually trigger contract sync from blockchain to Supabase
+ * Legacy: Manually trigger rental contract sync from blockchain to Supabase
  */
 router.post('/sync', asyncHandler(async (req: Request, res: Response) => {
   const { contractAddress } = req.body
@@ -21,6 +28,101 @@ router.post('/sync', asyncHandler(async (req: Request, res: Response) => {
   logger.info('Manual contract sync requested', { contractAddress })
 
   const contract = await syncContract(contractAddress as Address)
+
+  res.json({ contract })
+}))
+
+/**
+ * POST /api/contracts
+ * Store a newly deployed contract (any template type)
+ */
+router.post('/', asyncHandler(async (req: Request, res: Response) => {
+  const { template_id, contract_address, config, creator_address, basename } = req.body
+
+  if (!template_id || !contract_address || !config || !creator_address) {
+    throw new ValidationError('template_id, contract_address, config, and creator_address are required')
+  }
+
+  const template = getTemplate(template_id)
+  if (!template) {
+    throw new ValidationError(`Unknown template: ${template_id}`)
+  }
+
+  if (!/^0x[a-fA-F0-9]{40}$/.test(contract_address)) {
+    throw new ValidationError('Invalid contract address')
+  }
+
+  if (!/^0x[a-fA-F0-9]{40}$/.test(creator_address)) {
+    throw new ValidationError('Invalid creator address')
+  }
+
+  logger.info('Storing new contract', { template_id, contract_address, creator_address })
+
+  const contract = await createGenericContract({
+    template_id,
+    contract_address: contract_address.toLowerCase(),
+    config,
+    creator_address: creator_address.toLowerCase(),
+    basename: basename || null,
+  })
+
+  res.status(201).json({ contract })
+}))
+
+/**
+ * GET /api/contracts
+ * List contracts, optionally filtered by creator_address or user_address
+ */
+router.get('/', asyncHandler(async (req: Request, res: Response) => {
+  const userAddress = (req.query.user_address || req.query.creator_address) as string | undefined
+
+  if (!userAddress) {
+    throw new ValidationError('user_address or creator_address query parameter required')
+  }
+
+  if (!/^0x[a-fA-F0-9]{40}$/i.test(userAddress)) {
+    throw new ValidationError('Invalid address format')
+  }
+
+  const contracts = await getGenericUserContracts(userAddress.toLowerCase())
+
+  res.json({ contracts })
+}))
+
+/**
+ * GET /api/contracts/:address
+ * Get a single contract with on_chain_state
+ */
+router.get('/:address', asyncHandler(async (req: Request, res: Response) => {
+  const address = req.params.address as string
+
+  if (!/^0x[a-fA-F0-9]{40}$/i.test(address)) {
+    throw new ValidationError('Invalid contract address')
+  }
+
+  const contract = await getGenericContractByAddress(address.toLowerCase())
+
+  if (!contract) {
+    throw new NotFoundError('Contract not found')
+  }
+
+  res.json({ contract })
+}))
+
+/**
+ * PATCH /api/contracts/:address/sync
+ * Trigger blockchain sync for a generic contract
+ */
+router.patch('/:address/sync', asyncHandler(async (req: Request, res: Response) => {
+  const address = req.params.address as string
+
+  if (!/^0x[a-fA-F0-9]{40}$/i.test(address)) {
+    throw new ValidationError('Invalid contract address')
+  }
+
+  logger.info('Generic contract sync requested', { address })
+
+  const contract = await syncGenericContract(address.toLowerCase() as Address)
 
   res.json({ contract })
 }))
