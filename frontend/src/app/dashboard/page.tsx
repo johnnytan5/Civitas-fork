@@ -7,7 +7,8 @@ import { fetchUserContracts, type RentalContract } from '@/lib/contracts/fetch-c
 import NavigationRail from '@/components/layout/NavigationRail';
 import MarqueeTicker from '@/components/layout/MarqueeTicker';
 import CommandZone from '@/components/dashboard/CommandZone';
-import ExecutionZone from '@/components/dashboard/ExecutionZone';
+import ExecutionZoneRouter from '@/components/dashboard/ExecutionZoneRouter';
+import NetworkSwitcher from '@/components/wallet/NetworkSwitcher';
 
 // Generic contract type from database
 interface GenericContract {
@@ -34,8 +35,33 @@ export default function DashboardPage() {
   const [genericContracts, setGenericContracts] = useState<GenericContract[]>([]);
   const [selectedContract, setSelectedContract] = useState<AllContracts | null>(null);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
 
-  // Fetch both rental and generic contracts
+  // Function to refresh contracts (can be called manually)
+  const syncContracts = async () => {
+    if (!address || syncing) return;
+
+    try {
+      setSyncing(true);
+
+      // Fetch rental contracts (from blockchain)
+      const rentalData = await fetchUserContracts(address).catch(() => []);
+      setRentalContracts(rentalData);
+
+      // Fetch generic contracts (from database)
+      const response = await fetch(`/api/contracts/user/${address}`);
+      if (response.ok) {
+        const data = await response.json();
+        setGenericContracts(data.contracts || []);
+      }
+    } catch (error) {
+      console.error('Failed to sync contracts:', error);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  // Fetch both rental and generic contracts on mount
   useEffect(() => {
     async function loadContracts() {
       if (!address) {
@@ -80,6 +106,44 @@ export default function DashboardPage() {
       fallbackMessage="Connect your wallet to view and manage your contracts"
     >
       <div className="min-h-screen bg-paper-cream h-screen overflow-hidden relative">
+        {/* Network Switcher */}
+        <NetworkSwitcher />
+
+        {/* Sync Button */}
+        <button
+          onClick={syncContracts}
+          disabled={syncing || !address}
+          className={`
+            fixed top-4 right-64 z-50
+            flex items-center gap-2
+            px-4 py-2
+            border-2 border-black
+            shadow-[4px_4px_0px_#000]
+            font-display font-bold text-sm uppercase
+            transition-all
+            ${
+              syncing
+                ? 'bg-gray-300 text-gray-600 cursor-wait'
+                : 'bg-acid-lime text-void-black hover:shadow-[6px_6px_0px_#000] hover:translate-x-[-2px] hover:translate-y-[-2px] cursor-pointer'
+            }
+          `}
+        >
+          <svg
+            className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+            />
+          </svg>
+          <span>{syncing ? 'Syncing...' : 'Sync Contracts'}</span>
+        </button>
+
         {/* Navigation Rail */}
         <NavigationRail />
 
@@ -100,7 +164,7 @@ export default function DashboardPage() {
             />
 
             {/* Execution Zone */}
-            <ExecutionZone contract={selectedContract} />
+            <ExecutionZoneRouter contract={selectedContract} onSync={syncContracts} />
           </div>
         </div>
       </div>

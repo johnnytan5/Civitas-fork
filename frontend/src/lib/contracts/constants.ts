@@ -88,3 +88,9 @@ export const FACTORY_ADDRESS = CIVITAS_FACTORY_ADDRESS[baseSepolia.id];
 
 // @deprecated Use RENT_VAULT_IMPL instead
 export const RENTAL_IMPLEMENTATION = RENT_VAULT_IMPL[baseSepolia.id];
+
+// ============================================================================
+// Convenience Exports
+// ============================================================================
+
+export const BASE_USDC_ADDRESS = USDC_ADDRESS[baseSepolia.id]; // Default to testnet
