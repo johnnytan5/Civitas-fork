@@ -19,13 +19,33 @@ export default function RecipientView({ contract, userAddress, onSync }: Recipie
   const contractAddress = contract.contract_address as `0x${string}`;
 
   // Read treasury status
-  const { data: treasuryStatus } = useReadContract({
+  const { data: treasuryStatus, refetch, isLoading, isError } = useReadContract({
     address: contractAddress,
     abi: STABLE_ALLOWANCE_TREASURY_ABI,
     functionName: 'getTreasuryStatus',
   });
 
   const { writeContract: claim, isSuccess: isClaimSuccess } = useWriteContract();
+
+  // Debug: Log the treasury status
+  React.useEffect(() => {
+    console.log('📊 RecipientView - Treasury Status:', {
+      contractAddress,
+      treasuryStatus,
+      isLoading,
+      isError,
+      parsed: {
+        owner: treasuryStatus?.[0],
+        recipient: treasuryStatus?.[1],
+        allowancePerIncrement: treasuryStatus?.[2]?.toString(),
+        approvalCounter: treasuryStatus?.[3]?.toString(),
+        claimedCount: treasuryStatus?.[4]?.toString(),
+        unclaimed: treasuryStatus?.[5]?.toString(),
+        balance: treasuryStatus?.[6]?.toString(),
+        state: treasuryStatus?.[7]?.toString(),
+      }
+    });
+  }, [treasuryStatus, contractAddress, isLoading, isError]);
 
   // Auto-sync after successful claim
   React.useEffect(() => {
@@ -73,6 +93,14 @@ export default function RecipientView({ contract, userAddress, onSync }: Recipie
       <h2 className="font-headline text-2xl uppercase tracking-tighter absolute top-4 left-4 md:left-8 z-10 bg-stark-white px-3 py-1 border-2 border-black shadow-[4px_4px_0px_#000]">
         Execution Zone
       </h2>
+
+      {/* Debug Refresh Button */}
+      <button
+        onClick={() => refetch()}
+        className="absolute top-4 right-4 z-10 px-3 py-1 border-2 border-black bg-warning-yellow font-bold text-xs hover:bg-yellow-300"
+      >
+        🔄 Force Refresh
+      </button>
 
       {/* Recipient Card */}
       <div className="w-full max-w-md relative z-10 mb-8">

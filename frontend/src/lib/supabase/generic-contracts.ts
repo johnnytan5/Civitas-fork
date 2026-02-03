@@ -25,10 +25,17 @@ export async function getContractByAddress(contractAddress: string): Promise<Con
 export async function getUserContracts(userAddress: string): Promise<Contract[]> {
   const supabase = createServiceClient()
 
+  // Normalize address to lowercase for comparison
+  const normalizedAddress = userAddress.toLowerCase()
+
+  // Query contracts where user is a participant
   const { data, error } = await supabase
     .from('contracts')
-    .select('*')
-    .eq('creator_address', userAddress)
+    .select(`
+      *,
+      contract_participants!inner(user_address, role, share_bps)
+    `)
+    .eq('contract_participants.user_address', normalizedAddress)
     .order('created_at', { ascending: false })
 
   if (error) {
@@ -51,7 +58,115 @@ export async function createGenericContract(contract: ContractInsert): Promise<C
     throw new Error(`Failed to create contract: ${error.message}`, { cause: error })
   }
 
+  // Add participants to the junction table
+  await addContractParticipants(data.id, contract.config, contract.template_id)
+
   return data
+}
+
+/**
+ * Add all participants for a contract to the contract_participants table
+ */
+async function addContractParticipants(
+  contractId: string,
+  config: any,
+  templateId: string
+): Promise<void> {
+  const supabase = createServiceClient()
+  const participants: Array<{
+    contract_id: string
+    user_address: string
+    role: string
+    share_bps?: number
+  }> = []
+
+  // Add creator
+  if (config.creator) {
+    participants.push({
+      contract_id: contractId,
+      user_address: config.creator.toLowerCase(),
+      role: 'creator',
+    })
+  }
+
+  // Add template-specific participants
+  switch (templateId) {
+    case 'RentVault':
+      // Add recipient (landlord)
+      if (config.recipient) {
+        participants.push({
+          contract_id: contractId,
+          user_address: config.recipient.toLowerCase(),
+          role: 'recipient',
+        })
+      }
+
+      // Add all tenants with their shares
+      if (config.tenants && Array.isArray(config.tenants)) {
+        config.tenants.forEach((tenant: string, index: number) => {
+          participants.push({
+            contract_id: contractId,
+            user_address: tenant.toLowerCase(),
+            role: 'tenant',
+            share_bps: config.shareBps?.[index],
+          })
+        })
+      }
+      break
+
+    case 'GroupBuyEscrow':
+      // Add recipient (purchaser)
+      if (config.recipient) {
+        participants.push({
+          contract_id: contractId,
+          user_address: config.recipient.toLowerCase(),
+          role: 'recipient',
+        })
+      }
+
+      // Add all participants with their shares
+      if (config.participants && Array.isArray(config.participants)) {
+        config.participants.forEach((participant: string, index: number) => {
+          participants.push({
+            contract_id: contractId,
+            user_address: participant.toLowerCase(),
+            role: 'participant',
+            share_bps: config.shareBps?.[index],
+          })
+        })
+      }
+      break
+
+    case 'StableAllowanceTreasury':
+      // Add owner
+      if (config.owner) {
+        participants.push({
+          contract_id: contractId,
+          user_address: config.owner.toLowerCase(),
+          role: 'owner',
+        })
+      }
+
+      // Add recipient (beneficiary)
+      if (config.recipient) {
+        participants.push({
+          contract_id: contractId,
+          user_address: config.recipient.toLowerCase(),
+          role: 'recipient',
+        })
+      }
+      break
+  }
+
+  // Insert all participants
+  if (participants.length > 0) {
+    const { error } = await supabase.from('contract_participants').insert(participants)
+
+    if (error) {
+      console.error('Failed to add contract participants:', error)
+      // Don't throw - contract is already created, this is supplementary data
+    }
+  }
 }
 
 export async function updateGenericContract(
