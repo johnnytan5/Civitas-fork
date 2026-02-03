@@ -130,12 +130,41 @@ export function useCivitasContractDeploy() {
         throw new Error(`Unknown template: ${template}`);
     }
 
-    writeContract({
-      address: factoryAddress,
-      abi: CIVITAS_FACTORY_ABI,
-      functionName: functionName as any,
-      args,
-    });
+    console.log('🚀 Calling factory function:', functionName);
+    console.log('📋 With args:', args);
+    console.log('🏭 Factory address:', factoryAddress);
+
+    // Optional simulation (non-blocking) - wallet will do its own validation
+    if (publicClient) {
+      try {
+        console.log('🔍 Pre-simulating transaction...');
+        await publicClient.simulateContract({
+          address: factoryAddress,
+          abi: CIVITAS_FACTORY_ABI,
+          functionName: functionName as any,
+          args,
+          account: address,
+        });
+        console.log('✅ Pre-simulation successful!');
+      } catch (simulationError: any) {
+        console.warn('⚠️ Pre-simulation failed (non-blocking):', simulationError.message);
+        console.log('Proceeding anyway - wallet will validate the transaction');
+        // Don't throw - let the wallet handle validation
+      }
+    }
+
+    try {
+      writeContract({
+        address: factoryAddress,
+        abi: CIVITAS_FACTORY_ABI,
+        functionName: functionName as any,
+        args,
+      });
+    } catch (error: any) {
+      console.error('❌ Write contract error:', error);
+      clearPendingDeployment();
+      throw error;
+    }
   };
 
   /**
@@ -148,6 +177,11 @@ export function useCivitasContractDeploy() {
       try {
         setIsStoring(true);
         console.log('✅ Transaction confirmed! Parsing logs...');
+
+        // Skip database storage for test page (these are template contracts, not rental contracts)
+        // TODO: Update database schema to support all 3 contract types
+        console.log('ℹ️ Skipping database storage for test contract deployment');
+        return;
 
         // Parse the event logs to get the deployed contract address
         let contractAddress: `0x${string}` | null = null;

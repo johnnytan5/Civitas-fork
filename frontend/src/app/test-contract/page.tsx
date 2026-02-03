@@ -240,7 +240,15 @@ function RentVaultForm({
   const { address } = useAccount();
   const [recipient, setRecipient] = useState(address || '');
   const [rentAmount, setRentAmount] = useState('1000');
-  const [dueDate, setDueDate] = useState('');
+
+  // Set default due date to 30 days from now
+  const getDefaultDueDate = () => {
+    const date = new Date();
+    date.setDate(date.getDate() + 30);
+    return date.toISOString().slice(0, 16); // Format for datetime-local input
+  };
+
+  const [dueDate, setDueDate] = useState(getDefaultDueDate());
   const [tenants, setTenants] = useState<string[]>([address || '']);
   const [shares, setShares] = useState<string[]>(['10000']);
 
@@ -331,14 +339,18 @@ function RentVaultForm({
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
-          Due Date
+          Due Date (must be in the future)
         </label>
         <input
           type="datetime-local"
           value={dueDate}
           onChange={(e) => setDueDate(e.target.value)}
+          min={new Date().toISOString().slice(0, 16)}
           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         />
+        <p className="text-xs text-gray-500 mt-1">
+          Default: 30 days from now
+        </p>
       </div>
 
       <div>
@@ -409,7 +421,15 @@ function GroupBuyEscrowForm({
   const { address } = useAccount();
   const [recipient, setRecipient] = useState(address || '');
   const [fundingGoal, setFundingGoal] = useState('5000');
-  const [expiryDate, setExpiryDate] = useState('');
+
+  // Set default expiry to 30 days from now
+  const getDefaultExpiryDate = () => {
+    const date = new Date();
+    date.setDate(date.getDate() + 30);
+    return date.toISOString().slice(0, 16);
+  };
+
+  const [expiryDate, setExpiryDate] = useState(getDefaultExpiryDate());
   const [timelockDelay, setTimelockDelay] = useState('7'); // days
   const [participants, setParticipants] = useState<string[]>([address || '']);
   const [shares, setShares] = useState<string[]>(['10000']);
@@ -503,14 +523,18 @@ function GroupBuyEscrowForm({
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
-          Expiry Date
+          Expiry Date (must be in the future)
         </label>
         <input
           type="datetime-local"
           value={expiryDate}
           onChange={(e) => setExpiryDate(e.target.value)}
+          min={new Date().toISOString().slice(0, 16)}
           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         />
+        <p className="text-xs text-gray-500 mt-1">
+          Default: 30 days from now
+        </p>
       </div>
 
       <div>
@@ -606,6 +630,10 @@ function StableAllowanceTreasuryForm({
       alert('Invalid recipient address');
       return;
     }
+    if (owner.toLowerCase() === recipient.toLowerCase()) {
+      alert('Owner and recipient cannot be the same address');
+      return;
+    }
     if (!allowance || parseFloat(allowance) <= 0) {
       alert('Allowance must be greater than 0');
       return;
@@ -634,6 +662,9 @@ function StableAllowanceTreasuryForm({
           placeholder="0x..."
           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         />
+        <p className="text-xs text-gray-500 mt-1">
+          The address that approves each allowance release
+        </p>
       </div>
 
       <div>
@@ -644,9 +675,17 @@ function StableAllowanceTreasuryForm({
           type="text"
           value={recipient}
           onChange={(e) => setRecipient(e.target.value)}
-          placeholder="0x..."
+          placeholder="0x... (must be different from owner)"
           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         />
+        <p className="text-xs text-gray-500 mt-1">
+          The address that receives funds (cannot be the same as owner)
+        </p>
+        {owner && recipient && owner.toLowerCase() === recipient.toLowerCase() && (
+          <p className="text-xs text-red-600 mt-1 font-semibold">
+            ⚠️ Owner and recipient cannot be the same address
+          </p>
+        )}
       </div>
 
       <div>
