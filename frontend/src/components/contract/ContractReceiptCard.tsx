@@ -52,14 +52,29 @@ export function ContractReceiptCard({
     switch (field.type) {
       case 'address':
         if (typeof value === 'string' && value.startsWith('0x')) {
-          return value.slice(0, 10) + '...' + value.slice(-8)
+          return `${value.slice(0, 6)}...${value.slice(-4)}`
         }
         return value
+      case 'addressList':
+        // Return array for special rendering below
+        return Array.isArray(value) ? value : []
+      case 'bpsList':
+        // Return array for special rendering below
+        return Array.isArray(value) ? value : []
+      case 'duration':
+        try {
+          const seconds = typeof value === 'string' ? parseInt(value) : value
+          if (seconds >= 86400) return `${Math.floor(seconds / 86400)} days`
+          if (seconds >= 3600) return `${Math.floor(seconds / 3600)} hours`
+          return `${seconds} seconds`
+        } catch {
+          return value
+        }
       case 'amount':
         try {
           const numValue = typeof value === 'string' ? value : value.toString()
           // Assume USDC with 6 decimals if value looks like wei
-          const formatted = numValue.length > 8 
+          const formatted = numValue.length > 8
             ? formatUnits(BigInt(numValue), 6)
             : numValue
           return (
@@ -73,9 +88,20 @@ export function ContractReceiptCard({
         }
       case 'date':
         try {
-          const timestamp = typeof value === 'string' ? parseInt(value) : value
-          const date = timestamp > 10000000000 ? new Date(timestamp) : new Date(timestamp * 1000)
-          return date.toLocaleDateString()
+          let date: Date
+          // Handle ISO 8601 string (from AI)
+          if (typeof value === 'string' && value.includes('T')) {
+            date = new Date(value)
+          } else {
+            const timestamp = typeof value === 'string' ? parseInt(value) : value
+            date = timestamp > 10000000000 ? new Date(timestamp) : new Date(timestamp * 1000)
+          }
+          // Format as "Feb 2, 2026"
+          return date.toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+          })
         } catch {
           return value
         }
@@ -97,6 +123,15 @@ export function ContractReceiptCard({
 
   const isComplete = completeness === 100
 
+  // Helper function to shorten address (first 4 + last 4)
+  const shortenAddress = (addr: string) => {
+    if (!addr || addr.length < 10) return addr
+    return `${addr.slice(0, 6)}...${addr.slice(-4)}`  // 0x + 4 chars ... last 4
+  }
+
+  // Get fields to display (prefer receiptFields over dashboardFields)
+  const fieldsToDisplay = template.receiptFields || template.dashboardFields
+
   return (
     <div className="sticky top-24 w-full max-w-md mx-auto">
       {/* Receipt Card with Jagged Bottom */}
@@ -110,14 +145,16 @@ export function ContractReceiptCard({
         {/* Header */}
         <div className="p-6 border-b-2 border-dashed border-black">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="font-black text-2xl uppercase tracking-tight">
+            <h3 className="font-black text-2xl uppercase tracking-tight text-black">
               RECEIPT
             </h3>
-            <div className="bg-black text-white px-3 py-1 font-mono text-xs">
-              {new Date().toISOString().split('T')[0]}
+            <div className="bg-black px-3 py-1 font-mono text-xs">
+              <span style={{ color: '#FFFFFF' }} className="font-bold">
+                {new Date().toISOString().split('T')[0]}
+              </span>
             </div>
           </div>
-          <div className="font-mono text-sm">
+          <div className="font-mono text-sm text-black">
             TEMPLATE: {template.name.toUpperCase()}
           </div>
         </div>
@@ -125,10 +162,10 @@ export function ContractReceiptCard({
         {/* Progress Bar */}
         <div className="px-6 pt-4">
           <div className="flex items-center justify-between mb-2">
-            <span className="font-mono text-xs uppercase font-bold">
+            <span className="font-mono text-xs uppercase font-bold text-black">
               COMPLETION
             </span>
-            <span className="font-mono text-xs font-bold">
+            <span className="font-mono text-xs font-bold text-black">
               {completeness.toFixed(0)}%
             </span>
           </div>
@@ -142,10 +179,17 @@ export function ContractReceiptCard({
 
         {/* Parameters */}
         <div className="p-6 space-y-4">
-          {template.dashboardFields.map((field, index) => {
+          {fieldsToDisplay.map((field, index) => {
             const value = config?.[field.key]
             const hasValue =
               value !== undefined && value !== null && value !== ''
+
+            // Skip shareBps as separate row (rendered inline with addressList)
+            if (field.key === 'shareBps') {
+              return null
+            }
+
+            const formattedValue = formatValue(field, value)
 
             return (
               <div key={field.key}>
@@ -153,25 +197,43 @@ export function ContractReceiptCard({
                 <div className="flex items-center justify-between gap-4">
                   <div className="flex items-center gap-2 flex-1">
                     {hasValue ? (
-                      <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+                      <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-green-600" />
                     ) : (
-                      <AlertCircle className="w-4 h-4 flex-shrink-0 opacity-30" />
+                      <AlertCircle className="w-4 h-4 flex-shrink-0 opacity-30 text-gray-400" />
                     )}
-                    <span className="font-mono text-xs uppercase font-bold">
+                    <span className="font-mono text-xs uppercase font-bold text-black bg-white">
                       {field.label}
                     </span>
                   </div>
-                  <span
-                    className={`font-mono text-sm text-right ${
-                      hasValue ? 'font-bold' : 'opacity-30'
-                    }`}
-                  >
-                    {formatValue(field, value)}
-                  </span>
+                  {field.type !== 'addressList' && (
+                    <span
+                      className={`font-mono text-sm text-right bg-white ${
+                        hasValue ? 'font-bold text-black' : 'opacity-30 text-gray-400'
+                      }`}
+                    >
+                      {formattedValue}
+                    </span>
+                  )}
                 </div>
 
+                {/* Special rendering for addressList with share percentages */}
+                {field.type === 'addressList' && Array.isArray(formattedValue) && formattedValue.length > 0 && (
+                  <div className="mt-2 space-y-1 pl-6">
+                    {formattedValue.map((addr: string, i: number) => {
+                      const shareBps = config?.shareBps?.[i]
+                      const sharePercent = shareBps ? (shareBps / 100).toFixed(1) : '?'
+                      return (
+                        <div key={i} className="flex justify-between text-xs font-mono text-black">
+                          <span>{i + 1}. {shortenAddress(addr)}</span>
+                          <span className="font-bold">{sharePercent}%</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+
                 {/* Dashed divider */}
-                {index < template.dashboardFields.length - 1 && (
+                {index < fieldsToDisplay.length - 1 && (
                   <div className="border-b border-dashed border-black mt-4" />
                 )}
               </div>
@@ -245,21 +307,21 @@ export function ContractReceiptCard({
       {/* Status Message */}
       {!isComplete && !isDeploying && !isSuccess && (
         <div className="mt-4 bg-[#FFD600] border-[3px] border-black p-4">
-          <p className="font-mono text-sm font-bold">
+          <p className="font-mono text-sm font-bold text-black">
             [WAITING] Fill all parameters to proceed
           </p>
         </div>
       )}
-      
+
       {/* Success Details */}
       {isSuccess && deployedAddress && (
         <div className="mt-4 bg-[#CCFF00] border-[3px] border-black p-4 shadow-[4px_4px_0px_#000]">
           <div className="space-y-2">
-            <p className="font-mono text-sm font-bold flex items-center gap-2">
+            <p className="font-mono text-sm font-bold text-black flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4" />
               [DEPLOYED] Contract successfully created!
             </p>
-            <p className="font-mono text-xs break-all">
+            <p className="font-mono text-xs break-all text-black">
               Address: {deployedAddress}
             </p>
           </div>

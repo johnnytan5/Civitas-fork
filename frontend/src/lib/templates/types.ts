@@ -3,7 +3,7 @@ import type { z } from 'zod'
 export interface TemplateField {
   key: string
   label: string
-  type: 'address' | 'amount' | 'date' | 'state' | 'text' | 'progress' | 'number' | 'boolean' | 'array'
+  type: 'address' | 'amount' | 'date' | 'state' | 'text' | 'progress' | 'number' | 'boolean' | 'array' | 'addressList' | 'bpsList' | 'duration'
   format?: (value: any) => string
   description?: string
 }
@@ -41,6 +41,7 @@ export interface TemplateDefinition {
   // UI Hints
   // ============================================
   dashboardFields: TemplateField[]
+  receiptFields?: TemplateField[] // Fields shown in pre-deployment receipt (subset of AI-extracted fields)
   actionButtons: TemplateAction[]
   icon: string // Lucide icon name
   color: string // Neo-Brutalist accent color
