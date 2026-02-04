@@ -25,7 +25,35 @@ const RentVaultTemplate: TemplateDefinition = {
   ],
   
   parameterSchema: RentVaultConfigSchema,
-  
+
+  receiptFields: [
+    {
+      key: 'recipient',
+      label: 'Landlord',
+      type: 'address',
+    },
+    {
+      key: 'rentAmount',
+      label: 'Total Rent',
+      type: 'amount',
+    },
+    {
+      key: 'dueDate',
+      label: 'Due Date',
+      type: 'date',
+    },
+    {
+      key: 'tenants',
+      label: 'Tenants',
+      type: 'addressList',
+    },
+    {
+      key: 'shareBps',
+      label: 'Share %',
+      type: 'bpsList',
+    },
+  ],
+
   dashboardFields: [
     {
       key: 'recipient',
@@ -119,7 +147,40 @@ const GroupBuyEscrowTemplate: TemplateDefinition = {
   ],
   
   parameterSchema: GroupBuyEscrowConfigSchema,
-  
+
+  receiptFields: [
+    {
+      key: 'recipient',
+      label: 'Seller',
+      type: 'address',
+    },
+    {
+      key: 'fundingGoal',
+      label: 'Funding Goal',
+      type: 'amount',
+    },
+    {
+      key: 'expiryDate',
+      label: 'Expiry',
+      type: 'date',
+    },
+    {
+      key: 'timelockRefundDelay',
+      label: 'Refund Delay',
+      type: 'duration',
+    },
+    {
+      key: 'participants',
+      label: 'Participants',
+      type: 'addressList',
+    },
+    {
+      key: 'shareBps',
+      label: 'Share %',
+      type: 'bpsList',
+    },
+  ],
+
   dashboardFields: [
     {
       key: 'recipient',
@@ -244,7 +305,25 @@ const StableAllowanceTreasuryTemplate: TemplateDefinition = {
   ],
   
   parameterSchema: StableAllowanceTreasuryConfigSchema,
-  
+
+  receiptFields: [
+    {
+      key: 'owner',
+      label: 'Owner',
+      type: 'address',
+    },
+    {
+      key: 'recipient',
+      label: 'Recipient',
+      type: 'address',
+    },
+    {
+      key: 'allowancePerIncrement',
+      label: 'Amount per Claim',
+      type: 'amount',
+    },
+  ],
+
   dashboardFields: [
     {
       key: 'owner',
