@@ -243,3 +243,231 @@ p, span, div {
 .animate-pulse-scale-delay-2 {
   animation: pulse-scale 1.5s ease-in-out 0.3s infinite;
 }
+
+/* Markdown Styles - Neo Brutalist */
+.prose-civitas {
+  max-width: 100%;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+/* Headings */
+.prose-civitas h1,
+.prose-civitas h2,
+.prose-civitas h3,
+.prose-civitas h4,
+.prose-civitas h5,
+.prose-civitas h6 {
+  font-family: var(--font-headline);
+  font-weight: 900;
+  color: #000;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  line-height: 1.2;
+}
+
+.prose-civitas h1 {
+  font-size: 1.75rem;
+}
+
+.prose-civitas h2 {
+  font-size: 1.5rem;
+}
+
+.prose-civitas h3 {
+  font-size: 1.25rem;
+}
+
+/* Paragraphs */
+.prose-civitas p {
+  margin-top: 0.75em;
+  margin-bottom: 0.75em;
+  line-height: 1.6;
+}
+
+/* Links */
+.prose-civitas a {
+  color: #FF00FF;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 2px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.prose-civitas a:hover {
+  background-color: #FF00FF;
+  color: #000;
+  text-decoration: none;
+  padding: 0 4px;
+}
+
+/* Inline Code */
+.prose-civitas :not(pre) > code {
+  background-color: #FFD600;
+  color: #000;
+  padding: 2px 6px;
+  border: 2px solid #000;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9em;
+  font-weight: 600;
+  border-radius: 0;
+}
+
+/* Code Blocks */
+.prose-civitas pre {
+  background-color: #000;
+  color: #CCFF00;
+  border: 3px solid #000;
+  padding: 1rem;
+  margin: 1em 0;
+  overflow-x: auto;
+  box-shadow: 4px 4px 0px #000;
+  font-family: 'Courier New', monospace;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.prose-civitas pre code {
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: inherit;
+  font-size: inherit;
+}
+
+/* Lists */
+.prose-civitas ul,
+.prose-civitas ol {
+  margin: 1em 0;
+  padding-left: 2em;
+}
+
+.prose-civitas li {
+  margin: 0.5em 0;
+  line-height: 1.6;
+}
+
+.prose-civitas ul > li {
+  list-style-type: none;
+  position: relative;
+}
+
+.prose-civitas ul > li::before {
+  content: '▸';
+  position: absolute;
+  left: -1.5em;
+  color: #FF00FF;
+  font-weight: 900;
+}
+
+.prose-civitas ol {
+  list-style-type: decimal;
+  list-style-position: outside;
+}
+
+.prose-civitas ol > li {
+  padding-left: 0.5em;
+}
+
+.prose-civitas ol > li::marker {
+  color: #FF00FF;
+  font-weight: 900;
+}
+
+/* Blockquotes */
+.prose-civitas blockquote {
+  border-left: 4px solid #FF00FF;
+  padding-left: 1em;
+  margin: 1em 0;
+  background-color: #FAF9F6;
+  padding: 1em;
+  font-style: italic;
+  border: 3px solid #000;
+  border-left-width: 8px;
+  border-left-color: #FF00FF;
+}
+
+.prose-civitas blockquote p {
+  margin: 0;
+}
+
+/* Tables */
+.prose-civitas table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin: 1em 0;
+  border: 3px solid #000;
+  box-shadow: 4px 4px 0px #000;
+}
+
+.prose-civitas th,
+.prose-civitas td {
+  border: 2px solid #000;
+  padding: 0.75em 1em;
+  text-align: left;
+}
+
+.prose-civitas th {
+  background-color: #CCFF00;
+  font-weight: 900;
+  text-transform: uppercase;
+  font-family: var(--font-headline);
+  letter-spacing: 0.05em;
+}
+
+.prose-civitas td {
+  background-color: #FFF;
+}
+
+.prose-civitas tr:nth-child(even) td {
+  background-color: #FAF9F6;
+}
+
+/* Horizontal Rules */
+.prose-civitas hr {
+  border: none;
+  border-top: 3px solid #000;
+  margin: 2em 0;
+  box-shadow: 0 3px 0 #000;
+}
+
+/* Strong/Bold */
+.prose-civitas strong {
+  font-weight: 900;
+  color: #000;
+}
+
+/* Emphasis/Italic */
+.prose-civitas em {
+  font-style: italic;
+  color: #000;
+}
+
+/* Task Lists */
+.prose-civitas .task-list-item {
+  list-style-type: none;
+}
+
+.prose-civitas .task-list-item::before {
+  content: none;
+}
+
+.prose-civitas .task-list-item input[type="checkbox"] {
+  margin-right: 0.5em;
+  width: 1.2em;
+  height: 1.2em;
+  border: 3px solid #000;
+  accent-color: #CCFF00;
+  cursor: pointer;
+}
+
+/* Strikethrough */
+.prose-civitas del {
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+  opacity: 0.7;
+}

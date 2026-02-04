@@ -10,6 +10,8 @@ interface ContractReceiptCardProps {
   config: any
   onDeploy?: () => void
   isDeploying?: boolean
+  isSuccess?: boolean
+  deployedAddress?: string
 }
 
 export function ContractReceiptCard({
@@ -17,6 +19,8 @@ export function ContractReceiptCard({
   config,
   onDeploy,
   isDeploying = false,
+  isSuccess = false,
+  deployedAddress,
 }: ContractReceiptCardProps) {
   const [completeness, setCompleteness] = useState(0)
   const [isPressed, setIsPressed] = useState(false)
@@ -189,38 +193,76 @@ export function ContractReceiptCard({
         </div>
       </div>
 
-      {/* Deploy Button - THE SMASH */}
-      <button
-        disabled={!isComplete || isDeploying}
-        onMouseDown={() => setIsPressed(true)}
-        onMouseUp={() => setIsPressed(false)}
-        onMouseLeave={() => setIsPressed(false)}
-        onClick={onDeploy}
-        className={`
-          w-full mt-6 py-6 font-black text-2xl uppercase tracking-tight
-          border-[3px] border-black transition-all duration-75
-          ${
-            isComplete && !isDeploying
-              ? isPressed
+      {/* Deploy Button or Success Indicator */}
+      {isSuccess && deployedAddress ? (
+        <a
+          href={`/dashboard`}
+          onMouseDown={() => setIsPressed(true)}
+          onMouseUp={() => setIsPressed(false)}
+          onMouseLeave={() => setIsPressed(false)}
+          className={`
+            block w-full mt-6 py-6 font-black text-2xl uppercase tracking-tight
+            border-[3px] border-black transition-all duration-75
+            ${
+              isPressed
                 ? 'bg-white translate-x-[4px] translate-y-[4px] shadow-none cursor-pointer'
-                : 'bg-[#FF00FF] shadow-[4px_4px_0px_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_#000] cursor-pointer'
-              : 'bg-[#FAF9F6] text-gray-400 cursor-not-allowed shadow-none'
-          }
-        `}
-      >
-        {isDeploying 
-          ? '/// DEPLOYING ///' 
-          : isComplete 
-            ? '/// CONFIRM DEPLOY ///' 
-            : '/// INCOMPLETE ///'}
-      </button>
+                : 'bg-[#CCFF00] shadow-[4px_4px_0px_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_#000] cursor-pointer'
+            }
+          `}
+        >
+          <div className="flex items-center justify-center gap-3">
+            <CheckCircle2 className="w-8 h-8" />
+            <span>/// VIEW CONTRACT ///</span>
+          </div>
+        </a>
+      ) : (
+        <button
+          disabled={!isComplete || isDeploying}
+          onMouseDown={() => setIsPressed(true)}
+          onMouseUp={() => setIsPressed(false)}
+          onMouseLeave={() => setIsPressed(false)}
+          onClick={onDeploy}
+          className={`
+            w-full mt-6 py-6 font-black text-2xl uppercase tracking-tight
+            border-[3px] border-black transition-all duration-75
+            ${
+              isComplete && !isDeploying
+                ? isPressed
+                  ? 'bg-white translate-x-[4px] translate-y-[4px] shadow-none cursor-pointer'
+                  : 'bg-[#FF00FF] shadow-[4px_4px_0px_#000] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_#000] cursor-pointer'
+                : 'bg-[#FAF9F6] text-gray-400 cursor-not-allowed shadow-none'
+            }
+          `}
+        >
+          {isDeploying 
+            ? '/// DEPLOYING ///' 
+            : isComplete 
+              ? '/// CONFIRM DEPLOY ///' 
+              : '/// INCOMPLETE ///'}
+        </button>
+      )}
 
       {/* Status Message */}
-      {!isComplete && !isDeploying && (
+      {!isComplete && !isDeploying && !isSuccess && (
         <div className="mt-4 bg-[#FFD600] border-[3px] border-black p-4">
           <p className="font-mono text-sm font-bold">
             [WAITING] Fill all parameters to proceed
           </p>
+        </div>
+      )}
+      
+      {/* Success Details */}
+      {isSuccess && deployedAddress && (
+        <div className="mt-4 bg-[#CCFF00] border-[3px] border-black p-4 shadow-[4px_4px_0px_#000]">
+          <div className="space-y-2">
+            <p className="font-mono text-sm font-bold flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4" />
+              [DEPLOYED] Contract successfully created!
+            </p>
+            <p className="font-mono text-xs break-all">
+              Address: {deployedAddress}
+            </p>
+          </div>
         </div>
       )}
 

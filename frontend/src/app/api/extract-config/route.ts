@@ -1,11 +1,13 @@
 import { generateObject } from 'ai';
 import { getGoogleProvider } from '@/lib/ai/google-provider';
-import { 
+import {
   RentalConfigSchema,
   RentVaultConfigSchema,
   GroupBuyEscrowConfigSchema,
   StableAllowanceTreasuryConfigSchema,
 } from '@/lib/ai/schemas';
+import type { TimezoneInfo } from '@/hooks/useUserTimezone';
+import { getCurrentDateTimeContext, getDateConversionExamples } from '@/lib/ai/temporal-context';
 
 export const runtime = 'edge';
 
@@ -19,23 +21,53 @@ const schemaMap = {
 }
 
 // Get extraction prompt based on template
-function getExtractionPrompt(templateId: string): string {
+function getExtractionPrompt(templateId: string, timezoneInfo?: TimezoneInfo, walletAddress?: string): string {
+  const dateTimeContext = getCurrentDateTimeContext(timezoneInfo, walletAddress);
+  const dateExamples = getDateConversionExamples(timezoneInfo);
+
   switch (templateId) {
     case 'rent-vault':
-      return `Extract Rent Vault configuration from the conversation.
+      return `${dateTimeContext}
+
+Extract Rent Vault configuration from the conversation.
 
 Fields to extract (leave as undefined if not mentioned):
-- recipient: Landlord Ethereum address (0x...) - ONLY extract if explicitly mentioned
+- recipient: Landlord Ethereum address (0x...) - DEFAULT to connected wallet if user is landlord
 - rentAmount: Total rent in USDC (as string) - ONLY extract if explicitly mentioned
-- dueDate: Due date (ISO string or timestamp) - ONLY extract if explicitly mentioned
+- dueDate: Due date in ISO 8601 format - ONLY extract if explicitly mentioned
 - tenants: Array of tenant addresses - ONLY extract if explicitly mentioned
 - shareBps: Array of share basis points - ONLY extract if explicitly mentioned
 
-IMPORTANT: If the conversation doesn't contain specific values, leave all fields undefined. 
-Do NOT invent or guess values. Return an empty object if no contract data is available.`
+WALLET ADDRESS HANDLING:
+- If user indicates they are the landlord/recipient, use the connected wallet address automatically
+- DO NOT wait for them to provide their own address manually
+- Connected wallet: ${walletAddress || 'Not available'}
+
+CRITICAL DATE HANDLING RULES:
+1. Output format MUST be ISO 8601: "YYYY-MM-DDTHH:MM:SS.000Z"
+2. If user provides relative dates, calculate the NEXT occurrence as a specific date
+3. Use the user's local timezone (provided in context above) for all date calculations
+4. NEVER output natural language like "2nd of each month"
+
+${dateExamples}
+
+- shareBps: Array of share basis points - ONLY extract if explicitly mentioned`
 
     case 'group-buy-escrow':
       return `Extract Group Buy Escrow configuration from the conversation.
+
+<strict_constraints>
+- ONLY extract values explicitly stated.
+- Do NOT infer funding goals from partial mentions.
+- Ensure "expiryDate" is a specific calendar date.
+</strict_constraints>
+
+<chain_of_thought>
+1. Identify the "Seller" address.
+2. Confirm the "Funding Goal".
+3. Validate the "Expiry Date".
+4. List all "Participants".
+</chain_of_thought>
 
 Fields to extract (leave as undefined if not mentioned):
 - recipient: Seller Ethereum address (0x...) - ONLY extract if explicitly mentioned
@@ -43,20 +75,22 @@ Fields to extract (leave as undefined if not mentioned):
 - expiryDate: Funding deadline (ISO string or timestamp) - ONLY extract if explicitly mentioned
 - timelockRefundDelay: Refund delay in seconds (as string) - ONLY extract if explicitly mentioned
 - participants: Array of participant addresses - ONLY extract if explicitly mentioned
-- shareBps: Array of share basis points - ONLY extract if explicitly mentioned
-
-IMPORTANT: If the conversation doesn't contain specific values, leave all fields undefined. 
-Do NOT invent or guess values. Return an empty object if no contract data is available.`
+- shareBps: Array of share basis points - ONLY extract if explicitly mentioned`
 
     case 'stable-allowance-treasury':
       return `Extract Stable Allowance Treasury configuration from the conversation.
+
+<strict_constraints>
+- Owner and Recipient MUST be different.
+- Amount must be fixed per claim.
+</strict_constraints>
 
 Fields to extract (leave as undefined if not mentioned):
 - owner: Controller Ethereum address (0x...) - ONLY extract if explicitly mentioned
 - recipient: Beneficiary Ethereum address (0x...) - ONLY extract if explicitly mentioned
 - allowancePerIncrement: USDC per claim (as string) - ONLY extract if explicitly mentioned
 
-IMPORTANT: If the conversation doesn't contain specific values, leave all fields undefined. 
+IMPORTANT: If the conversation doesn't contain specific values, leave all fields undefined.
 Do NOT invent or guess values. Return an empty object if no contract data is available.
 Owner and recipient must be different addresses when both are provided.`
 
@@ -69,7 +103,7 @@ Leave all fields undefined if not mentioned. Do NOT invent or guess values.`
 }
 
 export async function POST(req: Request) {
-  const { messages, templateId } = await req.json();
+  const { messages, templateId, timezone, walletAddress } = await req.json();
 
   if (!templateId) {
     return Response.json(
@@ -79,7 +113,7 @@ export async function POST(req: Request) {
   }
 
   const schema = schemaMap[templateId as keyof typeof schemaMap];
-  
+
   if (!schema) {
     return Response.json(
       { error: `Unknown template: ${templateId}` },
@@ -88,11 +122,11 @@ export async function POST(req: Request) {
   }
 
   try {
-    const extractionPrompt = getExtractionPrompt(templateId);
-    
+    const extractionPrompt = getExtractionPrompt(templateId, timezone, walletAddress);
+
     // Get configured provider (local proxy in dev, official API in production)
     const google = getGoogleProvider();
-    
+
     const { object } = await generateObject({
       model: google('gemini-2.5-flash'),
       schema,
@@ -107,19 +141,19 @@ export async function POST(req: Request) {
       if (Array.isArray(value)) return value.length > 0;
       return value !== '';
     });
-    
-    const completeness = requiredFields.length > 0 
-      ? (filledFields.length / requiredFields.length) * 100 
+
+    const completeness = requiredFields.length > 0
+      ? (filledFields.length / requiredFields.length) * 100
       : 0;
 
-    return Response.json({ 
+    return Response.json({
       config: object,
       completeness,
     });
   } catch (error) {
     console.error('Config extraction error:', error);
     // Return empty config instead of 500 error
-    return Response.json({ 
+    return Response.json({
       config: {},
       completeness: 0,
     });
