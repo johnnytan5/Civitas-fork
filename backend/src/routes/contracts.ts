@@ -18,11 +18,12 @@ const router: Router = Router()
  * Store a newly deployed contract (any template type)
  */
 router.post('/', asyncHandler(async (req: Request, res: Response) => {
-  const { template_id, contract_address, config, creator_address, basename } = req.body
+  const { template_id, contract_address, config, creator_address, basename, chain_id } = req.body
 
   if (!template_id || !contract_address || !config || !creator_address) {
     throw new ValidationError('template_id, contract_address, config, and creator_address are required')
   }
+  // ... (validation checks remain same, just updating destructuring)
 
   const template = getTemplate(template_id)
   if (!template) {
@@ -45,6 +46,7 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
     config,
     creator_address: creator_address.toLowerCase(),
     basename: basename || null,
+    chain_id: chain_id || 84532, // Default to Base Sepolia
   })
 
   res.status(201).json({ contract })

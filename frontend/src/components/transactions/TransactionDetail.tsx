@@ -6,7 +6,7 @@ import EventTypeBadge from './EventTypeBadge';
 
 interface Transaction {
   id: string;
-  event_type: 'created' | 'activated' | 'rent_released' | 'termination_initiated' | 'terminated' | 'completed';
+  event_type: string;
   contract_address: string;
   basename: string | null;
   transaction_hash: string;

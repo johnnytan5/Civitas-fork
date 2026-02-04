@@ -10,23 +10,25 @@ import Link from 'next/link';
 
 interface Transaction {
   id: string;
-  event_type: 'created' | 'activated' | 'rent_released' | 'termination_initiated' | 'terminated' | 'completed';
+  event_type: string; // Derived from transaction_type
   contract_address: string;
   basename: string | null;
   transaction_hash: string;
   block_number: number;
   event_data: any;
-  created_at: string;
+  created_at: string; // Uses block_timestamp
   role?: string;
 }
 
 const EVENT_TYPE_FILTERS = [
   { value: 'all', label: 'All Events' },
-  { value: 'created', label: 'Deployments' },
-  { value: 'activated', label: 'Activations' },
-  { value: 'rent_released', label: 'Rent Releases' },
-  { value: 'termination_initiated', label: 'Terminations' },
-  { value: 'completed', label: 'Completed' },
+  { value: 'deployment', label: 'Deployments' },
+  { value: 'deposit', label: 'Deposits' },
+  { value: 'withdrawal', label: 'Withdrawals' },
+  { value: 'refund', label: 'Refunds' },
+  { value: 'claim', label: 'Claims' },
+  { value: 'goal_reached', label: 'Goals Reached' },
+  { value: 'funds_released', label: 'Funds Released' },
 ] as const;
 
 export default function TransactionsPage() {

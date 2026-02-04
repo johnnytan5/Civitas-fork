@@ -5,7 +5,7 @@ import EventTypeBadge from './EventTypeBadge';
 
 interface Transaction {
   id: string;
-  event_type: 'created' | 'activated' | 'rent_released' | 'termination_initiated' | 'terminated' | 'completed';
+  event_type: string;
   contract_address: string;
   basename: string | null;
   transaction_hash: string;
@@ -40,9 +40,8 @@ export default function TransactionCard({ event, isSelected, onClick }: Transact
     <HardShadowCard
       onClick={onClick}
       hoverable
-      className={`p-4 cursor-pointer transition-all duration-200 ${
-        isSelected ? 'ring-2 ring-acid-lime' : ''
-      }`}
+      className={`p-4 cursor-pointer transition-all duration-200 ${isSelected ? 'ring-2 ring-acid-lime' : ''
+        }`}
     >
       <div className="flex flex-col gap-2">
         {/* Event Type Badge */}
