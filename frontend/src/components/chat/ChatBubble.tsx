@@ -1,34 +1,46 @@
 'use client';
 
+import { Streamdown } from 'streamdown';
+import { code } from '@streamdown/code';
+
 interface ChatBubbleProps {
   role: 'user' | 'agent';
   message: string;
   timestamp?: string;
+  isLoading?: boolean;
 }
 
-export function ChatBubble({ role, message, timestamp }: ChatBubbleProps) {
+export function ChatBubble({ role, message, timestamp, isLoading = false }: ChatBubbleProps) {
   const isUser = role === 'user';
 
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-6`}>
-      <div className="relative">
+      <div className="relative max-w-prose">
         {/* Chat bubble container */}
         <div
-          className={`max-w-[75%] px-6 py-4 border-[3px] border-black ${
+          className={`px-6 py-4 border-[3px] border-black break-words ${
             isUser
               ? 'bg-hot-pink shadow-[3px_3px_0px_#000]'
               : 'bg-stark-white shadow-[3px_3px_0px_#000]'
           }`}
         >
-          <p
-            className={`whitespace-pre-wrap leading-relaxed ${
-              isUser 
-                ? 'text-base font-black text-black' 
-                : 'text-base font-display text-black font-medium'
-            }`}
-          >
-            {message}
-          </p>
+          {isUser ? (
+            <p
+              className="text-base font-black text-black leading-relaxed whitespace-pre-wrap"
+            >
+              {message}
+            </p>
+          ) : (
+            <div className="text-base font-display text-black font-medium leading-relaxed prose-civitas">
+              <Streamdown
+                plugins={{ code }}
+                isAnimating={role === 'agent' && isLoading}
+                caret={role === 'agent' && isLoading ? 'block' : undefined}
+              >
+                {message}
+              </Streamdown>
+            </div>
+          )}
           {timestamp && (
             <span className="block mt-2 text-xs font-display text-black opacity-60 uppercase tracking-wide">
               {timestamp}

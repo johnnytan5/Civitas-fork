@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { WalletGate } from '@/components/wallet/WalletGate';
 import { useTemplateChat } from '@/hooks/useTemplateChat';
 import { useCivitasContractDeploy } from '@/hooks/useCivitasContractDeploy';
@@ -17,6 +17,7 @@ import { transformConfigToDeployParams, validateConfig } from '@/lib/contracts/c
 import { CONTRACT_TEMPLATES, type ContractTemplate } from '@/lib/contracts/constants';
 
 export default function CreatePage() {
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const {
     messages,
     input,
@@ -44,6 +45,11 @@ export default function CreatePage() {
   const [deploymentError, setDeploymentError] = useState<string | null>(null);
 
   const allTemplates = templateRegistry.getAll();
+
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   const onSubmit = () => {
     handleSubmit(new Event('submit') as any);
@@ -123,6 +129,7 @@ export default function CreatePage() {
                         <ChatBubble
                           role={message.role === 'user' ? 'user' : 'agent'}
                           message={extractedText}
+                          isLoading={isLoading}
                         />
                       </div>
                     );
@@ -135,6 +142,9 @@ export default function CreatePage() {
                         </div>
                       </div>
                     )}
+                    
+                    {/* Auto-scroll anchor */}
+                    <div ref={messagesEndRef} />
                   </div>
                 )}
                 
@@ -199,6 +209,7 @@ export default function CreatePage() {
                       <ChatBubble
                         role={message.role === 'user' ? 'user' : 'agent'}
                         message={extractedText}
+                        isLoading={isLoading}
                       />
                     </div>
                   );
@@ -211,6 +222,9 @@ export default function CreatePage() {
                     </div>
                   </div>
                 )}
+                
+                {/* Auto-scroll anchor */}
+                <div ref={messagesEndRef} />
               </div>
 
               {/* Input Area */}
@@ -245,6 +259,8 @@ export default function CreatePage() {
                 config={extractedConfig}
                 onDeploy={handleDeploy}
                 isDeploying={isDeploying}
+                isSuccess={isSuccess}
+                deployedAddress={deployedAddress}
               />
 
               {/* Deployment Status Messages */}
@@ -276,14 +292,6 @@ export default function CreatePage() {
                 <div className="mt-4">
                   <StatusBanner variant="info">
                     Transaction submitted! Waiting for confirmation...
-                  </StatusBanner>
-                </div>
-              )}
-
-              {isSuccess && deployedAddress && (
-                <div className="mt-4">
-                  <StatusBanner variant="success">
-                    Contract deployed at {deployedAddress.slice(0, 10)}...{deployedAddress.slice(-8)}
                   </StatusBanner>
                 </div>
               )}
