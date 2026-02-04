@@ -14,7 +14,7 @@ import { LoadingSquares } from '@/components/ui/LoadingSquares';
 import NavigationRail from '@/components/layout/NavigationRail';
 import MarqueeTicker from '@/components/layout/MarqueeTicker';
 import { transformConfigToDeployParams, validateConfig } from '@/lib/contracts/config-transformer';
-import { CONTRACT_TEMPLATES, type ContractTemplate } from '@/lib/contracts/constants';
+import { CONTRACT_TEMPLATES, CIVITAS_ENS_DOMAIN, type ContractTemplate } from '@/lib/contracts/constants';
 
 export default function CreatePage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -40,6 +40,10 @@ export default function CreatePage() {
     isSuccess,
     deployedAddress,
     error: deployError,
+    ensStep,
+    ensName,
+    ensError,
+    isEnsRegistering,
   } = useCivitasContractDeploy();
 
   const [deploymentError, setDeploymentError] = useState<string | null>(null);
@@ -292,6 +296,42 @@ export default function CreatePage() {
                 <div className="mt-4">
                   <StatusBanner variant="info">
                     Transaction submitted! Waiting for confirmation...
+                  </StatusBanner>
+                </div>
+              )}
+
+              {/* ENS Registration Status */}
+              {ensStep === 'generating' && (
+                <div className="mt-4">
+                  <StatusBanner variant="info">
+                    Generating ENS name...
+                  </StatusBanner>
+                </div>
+              )}
+
+              {ensStep === 'registering' && (
+                <div className="mt-4">
+                  <StatusBanner variant="warning">
+                    Registering ENS name... (sign transaction)
+                  </StatusBanner>
+                </div>
+              )}
+
+              {ensStep === 'done' && ensName && (
+                <div className="mt-4">
+                  <div className="bg-[#CCFF00] border-[3px] border-black p-4 shadow-[4px_4px_0px_#000]">
+                    <p className="font-mono text-xs uppercase font-bold opacity-60 mb-1">ENS Registered</p>
+                    <p className="font-mono text-sm font-bold">
+                      {ensName}.{CIVITAS_ENS_DOMAIN}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {ensStep === 'skipped' && ensError && (
+                <div className="mt-4">
+                  <StatusBanner variant="warning">
+                    ENS registration skipped: {ensError}
                   </StatusBanner>
                 </div>
               )}

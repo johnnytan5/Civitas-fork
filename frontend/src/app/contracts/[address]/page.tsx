@@ -9,7 +9,8 @@ import MarqueeTicker from '@/components/layout/MarqueeTicker';
 import { templateRegistry } from '@/lib/templates/registry';
 import { StatusBanner } from '@/components/ui/StatusBanner';
 import { formatUnits } from 'viem';
-import { ExternalLink, Copy, Check } from 'lucide-react';
+import { ExternalLink, Copy, Check, Shield } from 'lucide-react';
+import { CIVITAS_ENS_DOMAIN } from '@/lib/contracts/constants';
 import Link from 'next/link';
 
 interface Contract {
@@ -254,6 +255,36 @@ export default function ContractDetailPage() {
                 >
                   <ExternalLink className="w-4 h-4" />
                 </a>
+              </div>
+
+              {/* ENS Identity */}
+              <div className="mt-4">
+                {contract.basename ? (
+                  <div className="bg-[#CCFF00] border-2 border-black px-4 py-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Shield className="w-4 h-4" />
+                        <div>
+                          <p className="font-mono text-xs uppercase font-bold opacity-60">ENS Identity</p>
+                          <p className="font-mono text-sm font-bold">
+                            {contract.basename}.{CIVITAS_ENS_DOMAIN}
+                          </p>
+                        </div>
+                      </div>
+                      <Link
+                        href={`/verify?name=${contract.basename}.${CIVITAS_ENS_DOMAIN}`}
+                        className="font-mono text-xs font-bold underline hover:no-underline"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        Verify
+                      </Link>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-[#FAF9F6] border-2 border-dashed border-black px-4 py-3">
+                    <p className="font-mono text-xs opacity-40">ENS subdomain not registered</p>
+                  </div>
+                )}
               </div>
 
               {/* User Roles */}

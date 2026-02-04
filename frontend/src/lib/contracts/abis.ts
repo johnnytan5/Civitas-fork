@@ -109,6 +109,43 @@ export const CIVITAS_FACTORY_ABI = [
     ],
     anonymous: false,
   },
+  // ENS Functions
+  {
+    type: 'function',
+    name: 'createSubdomainAndSetRecords',
+    inputs: [
+      { name: 'contractAddress', type: 'address', internalType: 'address' },
+      { name: 'basename', type: 'string', internalType: 'string' },
+      { name: 'keys', type: 'string[]', internalType: 'string[]' },
+      { name: 'values', type: 'string[]', internalType: 'string[]' },
+    ],
+    outputs: [{ name: 'fullBasename', type: 'string', internalType: 'string' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'calculateENSNode',
+    inputs: [{ name: 'basename', type: 'string', internalType: 'string' }],
+    outputs: [{ name: '', type: 'bytes32', internalType: 'bytes32' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'getContractByBasename',
+    inputs: [{ name: 'basename', type: 'string', internalType: 'string' }],
+    outputs: [{ name: '', type: 'address', internalType: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'event',
+    name: 'ENSRecordsSet',
+    inputs: [
+      { name: 'contractAddress', type: 'address', indexed: true, internalType: 'address' },
+      { name: 'node', type: 'bytes32', indexed: true, internalType: 'bytes32' },
+      { name: 'basename', type: 'string', indexed: false, internalType: 'string' },
+    ],
+    anonymous: false,
+  },
 ] as const;
 
 // ============================================================================
@@ -571,6 +608,30 @@ export const STABLE_ALLOWANCE_TREASURY_ABI = [
     name: 'unclaimedAllowances',
     inputs: [],
     outputs: [{ name: '', type: 'uint256', internalType: 'uint256' }],
+    stateMutability: 'view',
+  },
+] as const;
+
+// ============================================================================
+// ENS L2 Resolver ABI
+// ============================================================================
+
+export const ENS_L2_RESOLVER_ABI = [
+  {
+    type: 'function',
+    name: 'text',
+    inputs: [
+      { name: 'node', type: 'bytes32', internalType: 'bytes32' },
+      { name: 'key', type: 'string', internalType: 'string' },
+    ],
+    outputs: [{ name: '', type: 'string', internalType: 'string' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'addr',
+    inputs: [{ name: 'node', type: 'bytes32', internalType: 'bytes32' }],
+    outputs: [{ name: '', type: 'address', internalType: 'address payable' }],
     stateMutability: 'view',
   },
 ] as const;

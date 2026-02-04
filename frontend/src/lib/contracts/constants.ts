@@ -55,6 +55,16 @@ export const CONTRACT_TEMPLATES = {
 export type ContractTemplate = typeof CONTRACT_TEMPLATES[keyof typeof CONTRACT_TEMPLATES];
 
 // ============================================================================
+// ENS Configuration
+// ============================================================================
+
+export const ENS_L2_RESOLVER: Record<number, `0x${string}`> = {
+  [baseSepolia.id]: '0x6533C94869D28fAA8dF77cc63f9e2b2D6Cf77eBA',
+};
+
+export const CIVITAS_ENS_DOMAIN = 'civitas.basetest.eth';
+
+// ============================================================================
 // Time Constants
 // ============================================================================
 

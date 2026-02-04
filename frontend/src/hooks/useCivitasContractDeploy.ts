@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt, useChainId, usePublicClient } from 'wagmi';
 import { CIVITAS_FACTORY_ADDRESS, CONTRACT_TEMPLATES, type ContractTemplate } from '@/lib/contracts/constants';
 import { CIVITAS_FACTORY_ABI } from '@/lib/contracts/abis';
@@ -47,6 +47,8 @@ export interface StableAllowanceTreasuryParams {
 
 export type DeploymentParams = RentVaultParams | GroupBuyEscrowParams | StableAllowanceTreasuryParams;
 
+export type EnsStep = 'idle' | 'generating' | 'registering' | 'done' | 'skipped';
+
 export function useCivitasContractDeploy() {
   const { address } = useAccount();
   const chainId = useChainId();
@@ -59,6 +61,22 @@ export function useCivitasContractDeploy() {
     error: confirmError
   } = useWaitForTransactionReceipt({
     hash,
+  });
+
+  // ENS registration uses a separate writeContract instance
+  const {
+    writeContract: writeEnsContract,
+    data: ensHash,
+    isPending: isEnsPending,
+    error: ensWriteError,
+  } = useWriteContract();
+  const {
+    data: ensReceipt,
+    isLoading: isEnsConfirming,
+    isSuccess: isEnsSuccess,
+    error: ensConfirmError,
+  } = useWaitForTransactionReceipt({
+    hash: ensHash,
   });
 
   // Debug logging
@@ -89,6 +107,11 @@ export function useCivitasContractDeploy() {
   const [deploymentParams, setDeploymentParams] = useState<DeploymentParams | null>(null);
   const [hasStored, setHasStored] = useState(false);
 
+  // ENS state
+  const [ensStep, setEnsStep] = useState<EnsStep>('idle');
+  const [ensName, setEnsName] = useState<string | null>(null);
+  const [ensError, setEnsError] = useState<string | null>(null);
+
   /**
    * Deploy contract based on selected template
    */
@@ -107,6 +130,9 @@ export function useCivitasContractDeploy() {
     setDeployedAddress(null);
     setSelectedTemplate(template);
     setDeploymentParams(params);
+    setEnsStep('idle');
+    setEnsName(null);
+    setEnsError(null);
 
     // Persist deployment intent to localStorage BEFORE deploying
     const pendingDeployment: PendingDeployment = {
@@ -186,18 +212,183 @@ export function useCivitasContractDeploy() {
   };
 
   /**
+   * Build ENS text record keys/values based on template type
+   */
+  const buildENSRecords = useCallback((
+    template: ContractTemplate,
+    params: DeploymentParams,
+    creatorAddress: string,
+  ): { keys: string[]; values: string[] } => {
+    const keys: string[] = ['contract.type', 'contract.status', 'contract.creator'];
+    const values: string[] = [template, 'deployed', creatorAddress];
+
+    switch (template) {
+      case CONTRACT_TEMPLATES.RENT_VAULT: {
+        const p = params as RentVaultParams;
+        keys.push('contract.rent.amount', 'contract.rent.dueDate');
+        values.push(p.rentAmount.toString(), p.dueDate.toString());
+        break;
+      }
+      case CONTRACT_TEMPLATES.GROUP_BUY_ESCROW: {
+        const p = params as GroupBuyEscrowParams;
+        keys.push('contract.escrow.goal', 'contract.escrow.expiry');
+        values.push(p.fundingGoal.toString(), p.expiryDate.toString());
+        break;
+      }
+      case CONTRACT_TEMPLATES.STABLE_ALLOWANCE_TREASURY: {
+        const p = params as StableAllowanceTreasuryParams;
+        keys.push('contract.allowance.amount');
+        values.push(p.allowancePerIncrement.toString());
+        break;
+      }
+    }
+
+    return { keys, values };
+  }, []);
+
+  /**
+   * Register ENS subdomain for a deployed contract (non-blocking)
+   */
+  const registerENS = useCallback(async (
+    contractAddress: `0x${string}`,
+    template: ContractTemplate,
+    params: DeploymentParams,
+    config: Record<string, any>,
+  ) => {
+    const factoryAddress = CIVITAS_FACTORY_ADDRESS[chainId];
+    if (!factoryAddress || !address) {
+      setEnsStep('skipped');
+      return;
+    }
+
+    try {
+      // Step 1: Generate name via AI
+      setEnsStep('generating');
+      console.log('🏷️ Generating ENS name...');
+
+      const nameResponse = await fetch('/api/generate-name', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          templateId: template,
+          config,
+        }),
+      });
+
+      if (!nameResponse.ok) {
+        throw new Error('Failed to generate ENS name');
+      }
+
+      const { suggestedName } = await nameResponse.json();
+      console.log('🏷️ Generated name:', suggestedName);
+
+      // Step 2: Build records
+      const { keys, values } = buildENSRecords(template, params, address);
+
+      // Step 3: Call factory to register subdomain
+      setEnsStep('registering');
+      console.log('📝 Registering ENS subdomain...');
+
+      writeEnsContract({
+        address: factoryAddress,
+        abi: CIVITAS_FACTORY_ABI,
+        functionName: 'createSubdomainAndSetRecords',
+        args: [contractAddress, suggestedName, keys, values],
+      });
+
+      // Store the suggested name for later (we'll get the full name from the event)
+      setEnsName(suggestedName);
+    } catch (error: any) {
+      console.error('❌ ENS registration error:', error);
+      setEnsError(error.message || 'Failed to register ENS name');
+      setEnsStep('skipped');
+    }
+  }, [chainId, address, buildENSRecords, writeEnsContract]);
+
+  /**
+   * Handle ENS transaction confirmation
+   */
+  useEffect(() => {
+    if (!isEnsSuccess || !ensReceipt || !deployedAddress) return;
+
+    // Parse the ENSRecordsSet event to get the full basename
+    let fullBasename: string | null = null;
+    const factoryAddress = CIVITAS_FACTORY_ADDRESS[chainId];
+
+    for (const log of ensReceipt.logs) {
+      try {
+        if (log.address.toLowerCase() !== factoryAddress?.toLowerCase()) continue;
+
+        const decoded = decodeEventLog({
+          abi: CIVITAS_FACTORY_ABI,
+          data: log.data,
+          topics: log.topics,
+        });
+
+        if (decoded.eventName === 'ENSRecordsSet') {
+          fullBasename = decoded.args.basename as string;
+          console.log('🏷️ ENS registered:', fullBasename);
+          break;
+        }
+      } catch {
+        continue;
+      }
+    }
+
+    if (fullBasename) {
+      setEnsName(fullBasename);
+      setEnsStep('done');
+
+      // Update Supabase with the basename
+      fetch('/api/contracts/update', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contract_address: deployedAddress,
+          basename: fullBasename,
+        }),
+      }).then(res => {
+        if (res.ok) {
+          console.log('✅ Basename stored in database');
+        } else {
+          console.warn('⚠️ Failed to store basename in database');
+        }
+      }).catch(err => {
+        console.warn('⚠️ Failed to update basename:', err);
+      });
+    } else {
+      // Transaction succeeded but couldn't parse event - use the suggested name
+      setEnsStep('done');
+      console.warn('⚠️ ENS tx confirmed but could not parse event for full basename');
+    }
+  }, [isEnsSuccess, ensReceipt, deployedAddress, chainId]);
+
+  /**
+   * Handle ENS write/confirm errors (non-blocking)
+   */
+  useEffect(() => {
+    const error = ensWriteError || ensConfirmError;
+    if (error && ensStep === 'registering') {
+      console.error('❌ ENS transaction error:', error);
+      setEnsError(error.message || 'ENS registration transaction failed');
+      setEnsStep('skipped');
+    }
+  }, [ensWriteError, ensConfirmError, ensStep]);
+
+  /**
    * Auto-store contract in database after successful deployment
    */
   useEffect(() => {
     if (!isSuccess || !receipt || !selectedTemplate || !address || isStoring || !deploymentParams || hasStored) return;
 
     const storeContract = async () => {
+      let contractAddress: `0x${string}` | null = null;
+
       try {
         setIsStoring(true);
         console.log('✅ Transaction confirmed! Parsing logs...');
 
         // Parse the event logs to get the deployed contract address
-        let contractAddress: `0x${string}` | null = null;
         let eventName: string = '';
 
         // Determine which event to look for based on template
@@ -305,7 +496,7 @@ export function useCivitasContractDeploy() {
             creator_address: address,
             chain_id: chainId,
             state: 0, // Deployed state
-            basename: null, // Can add basename support later
+            basename: null, // Will be set after ENS registration
             config,
             transaction_hash: hash,
           }),
@@ -325,6 +516,9 @@ export function useCivitasContractDeploy() {
           setHasStored(true); // Mark as stored to prevent duplicate attempts
           console.log('✅ Contract stored in database:', result.contract.id);
           console.log('🎉 Deployment complete! Contract address:', contractAddress);
+
+          // Kick off ENS registration (non-blocking)
+          registerENS(contractAddress, selectedTemplate, deploymentParams, config);
         } else {
           console.warn('⚠️ Failed to store contract');
         }
@@ -333,8 +527,10 @@ export function useCivitasContractDeploy() {
         // If it's a duplicate key error, it means we already stored it successfully
         if (error.message?.includes('duplicate key')) {
           console.log('ℹ️ Contract already stored (duplicate prevented)');
-          setDeployedAddress(contractAddress);
-          setHasStored(true);
+          if (contractAddress) {
+            setDeployedAddress(contractAddress);
+            setHasStored(true);
+          }
         }
       } finally {
         setIsStoring(false);
@@ -342,15 +538,22 @@ export function useCivitasContractDeploy() {
     };
 
     storeContract();
-  }, [isSuccess, receipt, selectedTemplate, address, hash, isStoring, deploymentParams, chainId, hasStored]);
+  }, [isSuccess, receipt, selectedTemplate, address, hash, isStoring, deploymentParams, chainId, hasStored, registerENS]);
 
   return {
     deployContract,
     selectedTemplate,
     deployedAddress,
     isDeploying: isPending || isConfirming || isStoring,
+    isPending,
+    isConfirming,
     isSuccess: isSuccess && !isStoring,
     deploymentHash: hash,
     error: writeError || confirmError,
+    // ENS state
+    ensStep,
+    ensName,
+    ensError,
+    isEnsRegistering: isEnsPending || isEnsConfirming,
   };
 }

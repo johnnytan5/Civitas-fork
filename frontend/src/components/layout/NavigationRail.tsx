@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, MessageSquare, ArrowLeftRight, Wallet, Settings } from 'lucide-react';
+import { LayoutDashboard, MessageSquare, ArrowLeftRight, Wallet, Settings, ShieldCheck } from 'lucide-react';
 
 interface NavItem {
   href: string;
@@ -13,6 +13,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/create', icon: MessageSquare, label: 'Create' },
+  { href: '/verify', icon: ShieldCheck, label: 'Verify' },
   { href: '/transactions', icon: ArrowLeftRight, label: 'Transactions' },
   { href: '/wallet', icon: Wallet, label: 'Wallet' },
   { href: '/settings', icon: Settings, label: 'Settings' },

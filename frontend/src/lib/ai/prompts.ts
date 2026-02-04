@@ -210,16 +210,47 @@ Required fields:
 // ============================================
 // Name Generation
 // ============================================
-export const NAME_GENERATION_PROMPT = `Generate a semantic, memorable subdomain name for this rental agreement.
+export const NAME_GENERATION_PROMPT = `Generate a semantic, memorable subdomain name for this smart contract agreement.
 
 Guidelines:
 - Lowercase, hyphenated format (e.g., "downtown-studio-6mo")
 - Max 20 characters
-- Include location or property type if mentioned
-- Include duration if helpful
-- Make it human-readable
+- Make it human-readable and descriptive
+- Include relevant context from the contract type`;
 
-Example: For "1BR apartment in downtown Seattle for 12 months" → "seattle-1br-12mo"`;
+export function getNameGenerationPrompt(templateId: string): string {
+  switch (templateId) {
+    case 'rent-vault':
+    case 'RentVault':
+      return `${NAME_GENERATION_PROMPT}
+
+Template: Rent Vault (multi-tenant rent collection)
+- Include location or property type if mentioned in context
+- Include duration or amount hints if helpful
+- Examples: "seattle-1br-12mo", "downtown-studio", "oak-st-split"`;
+
+    case 'group-buy-escrow':
+    case 'GroupBuyEscrow':
+      return `${NAME_GENERATION_PROMPT}
+
+Template: Group Buy Escrow (group purchase with voting)
+- Include what's being purchased if mentioned
+- Include participant count if helpful
+- Examples: "macbook-3way", "group-tv-fund", "team-gear-buy"`;
+
+    case 'stable-allowance-treasury':
+    case 'StableAllowanceTreasury':
+      return `${NAME_GENERATION_PROMPT}
+
+Template: Stable Allowance Treasury (periodic allowance payments)
+- Include the relationship or purpose if mentioned
+- Include the amount if helpful
+- Examples: "kid-allowance-50", "team-stipend", "monthly-grant"`;
+
+    default:
+      return NAME_GENERATION_PROMPT;
+  }
+}
 
 // ============================================
 // Helper to get prompt by template ID

@@ -1,30 +1,48 @@
 import { generateObject } from 'ai';
 import { getGoogleProvider } from '@/lib/ai/google-provider';
 import { NameSuggestionSchema } from '@/lib/ai/schemas';
-import { NAME_GENERATION_PROMPT } from '@/lib/ai/prompts';
-import type { RentalConfig } from '@/lib/ai/schemas';
+import { getNameGenerationPrompt } from '@/lib/ai/prompts';
 
 export const runtime = 'edge';
 
 export async function POST(req: Request) {
-  const { config, conversationContext } = await req.json() as {
-    config: RentalConfig;
+  const { templateId, config, conversationContext } = await req.json() as {
+    templateId?: string;
+    config: Record<string, any>;
     conversationContext?: string;
   };
 
   try {
-    const prompt = `${NAME_GENERATION_PROMPT}
+    const basePrompt = getNameGenerationPrompt(templateId || 'rent-vault');
 
-Rental Details:
-- Tenant: ${config.tenant}
-- Monthly Amount: ${config.monthlyAmount} USDC
-- Duration: ${config.totalMonths} months
+    // Build template-specific detail section
+    let details = '';
+    const tid = templateId || 'rent-vault';
+
+    if (tid === 'rent-vault' || tid === 'RentVault') {
+      details = `Contract Details:
+- Tenant count: ${config.tenants?.length || 1}
+- Rent Amount: ${config.rentAmount || config.monthlyAmount || 'unknown'} USDC
+- Duration: ${config.totalMonths || 'ongoing'}`;
+    } else if (tid === 'group-buy-escrow' || tid === 'GroupBuyEscrow') {
+      details = `Contract Details:
+- Funding Goal: ${config.fundingGoal || 'unknown'} USDC
+- Participant count: ${config.participants?.length || 'unknown'}`;
+    } else if (tid === 'stable-allowance-treasury' || tid === 'StableAllowanceTreasury') {
+      details = `Contract Details:
+- Allowance per increment: ${config.allowancePerIncrement || 'unknown'} USDC`;
+    } else {
+      details = `Contract Details:\n${JSON.stringify(config, null, 2)}`;
+    }
+
+    const prompt = `${basePrompt}
+
+${details}
 
 ${conversationContext ? `Additional Context:\n${conversationContext}` : ''}
 
 Generate a memorable, semantic subdomain name.`;
 
-    // Get configured provider (local proxy in dev, official API in production)
     const google = getGoogleProvider();
 
     const { object } = await generateObject({

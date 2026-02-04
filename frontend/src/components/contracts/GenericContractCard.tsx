@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { Home, Users, Wallet, ExternalLink, Copy, Check } from 'lucide-react';
+import { Home, Users, Wallet, ExternalLink, Copy, Check, Shield } from 'lucide-react';
 import { templateRegistry } from '@/lib/templates/registry';
+import { CIVITAS_ENS_DOMAIN } from '@/lib/contracts/constants';
 import { formatUnits } from 'viem';
 import Link from 'next/link';
 
@@ -173,12 +174,18 @@ export function GenericContractCard({ contract }: GenericContractCardProps) {
           </div>
         </div>
 
-        {/* Basename */}
+        {/* Basename / ENS Identity */}
         {contract.basename && (
           <div className="mb-4 bg-[#CCFF00] border-2 border-black px-3 py-2">
-            <p className="font-mono text-sm font-bold">
-              {contract.basename}.base.eth
-            </p>
+            <div className="flex items-center justify-between">
+              <p className="font-mono text-sm font-bold">
+                {contract.basename}.{CIVITAS_ENS_DOMAIN}
+              </p>
+              <div className="flex items-center gap-1">
+                <Shield className="w-3 h-3" />
+                <span className="font-mono text-xs font-bold">ENS Verified</span>
+              </div>
+            </div>
           </div>
         )}
 
