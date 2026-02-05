@@ -82,8 +82,20 @@ export function useCivitasContractDeploy() {
   // Debug logging
   useEffect(() => {
     if (hash) {
-      console.log('📝 Transaction submitted:', hash);
-      console.log('🔗 View on BaseScan:', getExplorerTxUrl(chainId, hash));
+      console.log('');
+      console.log('========================================');
+      console.log('📝 TRANSACTION SUBMITTED');
+      console.log('========================================');
+      console.log('Transaction Hash:', hash);
+      console.log('Chain ID:', chainId);
+      console.log('BaseScan URL:', getExplorerTxUrl(chainId, hash));
+      console.log('');
+      console.log('🔍 IMMEDIATE CHECK:');
+      console.log('   1. Open BaseScan URL above');
+      console.log('   2. Does the transaction appear?');
+      console.log('   3. If NOT found → RPC issue (frontend not using Alchemy)');
+      console.log('   4. If found → Success! RPC is working');
+      console.log('========================================');
     }
   }, [hash, chainId]);
 
@@ -187,6 +199,18 @@ export function useCivitasContractDeploy() {
     }
 
     try {
+      console.log('');
+      console.log('========================================');
+      console.log('🚀 CALLING WRITECONTRACT');
+      console.log('========================================');
+      console.log('Chain ID:', chainId);
+      console.log('Factory:', factoryAddress);
+      console.log('Function:', functionName);
+      console.log('Args:', args);
+      console.log('');
+      console.log('⏳ Waiting for wallet approval...');
+      console.log('========================================');
+
       writeContract({
         address: factoryAddress,
         abi: CIVITAS_FACTORY_ABI,
@@ -395,8 +419,45 @@ export function useCivitasContractDeploy() {
 
         console.log(`🔍 Looking for ${eventName} event in ${receipt.logs.length} logs...`);
 
+        // FALLBACK: If receipt has no logs, fetch them manually
+        // This is needed for Base mainnet's public RPC which sometimes returns empty logs
+        let logsToProcess = receipt.logs;
+
+        if (logsToProcess.length === 0 && publicClient && receipt.blockNumber && hash) {
+          console.log('⚠️ Receipt has no logs, trying alternative methods...');
+
+          try {
+            // Method 1: Re-fetch the receipt (sometimes RPC needs a second request)
+            console.log('🔄 Re-fetching transaction receipt...');
+            const retryReceipt = await publicClient.getTransactionReceipt({ hash });
+            if (retryReceipt && retryReceipt.logs.length > 0) {
+              console.log(`✅ Retry successful! Found ${retryReceipt.logs.length} logs`);
+              logsToProcess = retryReceipt.logs;
+            } else {
+              // Method 2: Query logs with a block range (some RPCs don't like single-block queries)
+              console.log('🔄 Trying getLogs with block range...');
+              const startBlock = receipt.blockNumber - 1n > 0n ? receipt.blockNumber - 1n : receipt.blockNumber;
+              const fetchedLogs = await publicClient.getLogs({
+                address: CIVITAS_FACTORY_ADDRESS[chainId],
+                fromBlock: startBlock,
+                toBlock: receipt.blockNumber + 1n,
+              });
+
+              // Filter to only logs from our transaction
+              logsToProcess = fetchedLogs.filter(
+                log => log.transactionHash?.toLowerCase() === hash.toLowerCase()
+              ) as any[];
+
+              console.log(`✅ Fetched ${logsToProcess.length} logs from block range`);
+            }
+          } catch (logError: any) {
+            console.error('❌ Failed to fetch logs:', logError.message);
+            console.log('💡 Tip: This may be an RPC provider issue. Try using a custom RPC endpoint (Alchemy, Infura, etc.)');
+          }
+        }
+
         // Find the event in the logs (check ALL logs, including from internal txs)
-        for (const log of receipt.logs) {
+        for (const log of logsToProcess) {
           try {
             // Only try to decode logs from the factory address
             const factoryAddress = CIVITAS_FACTORY_ADDRESS[chainId];
@@ -427,11 +488,11 @@ export function useCivitasContractDeploy() {
 
         if (!contractAddress) {
           console.error('❌ Could not find contract address in logs');
-          console.log('📋 All logs:', receipt.logs);
+          console.log('📋 All logs:', logsToProcess);
           console.log('🏭 Looking for events from factory:', CIVITAS_FACTORY_ADDRESS[chainId]);
 
           // Log all log addresses to help debug
-          console.log('📍 Log addresses:', receipt.logs.map(l => l.address));
+          console.log('📍 Log addresses:', logsToProcess.map(l => l.address));
 
           setIsStoring(false);
           return;

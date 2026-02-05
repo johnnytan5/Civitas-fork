@@ -17,27 +17,27 @@ export function getTargetChainId(networkMode: NetworkMode): number {
 }
 
 // ============================================================================
-// CivitasFactory Addresses (Base Sepolia Deployment)
+// CivitasFactory Addresses
 // ============================================================================
 
 export const CIVITAS_FACTORY_ADDRESS: Record<number, `0x${string}`> = {
   [baseSepolia.id]: '0x1cF969a2D882A09927f051D4F8e9e31160Abe894',
-  [base.id]: '0xa44EbCC68383fc6761292A4D5Ec13127Cc123B56', // TODO: Update when deployed to mainnet
+  [base.id]: '0xAF4D13Cac35b65d24203962fF22Dc281f1C1Fc5C', // Base Mainnet (deployed)
 };
 
 export const RENT_VAULT_IMPL: Record<number, `0x${string}`> = {
   [baseSepolia.id]: '0x9F88C58521693d0A02554C0b079aFf679DAB261E',
-  [base.id]: '0x98EB94D9948c9CedeCeaB4e3E4aDEbb199F9faf7', // TODO: Update when deployed to mainnet
+  [base.id]: '0x48F9b605171E2ce2E04739f3b3b3fae9716445C0', // Base Mainnet (deployed)
 };
 
 export const GROUP_BUY_ESCROW_IMPL: Record<number, `0x${string}`> = {
   [baseSepolia.id]: '0x7107651cD170931EA3caF552299CEA49D7EC7a6E',
-  [base.id]: '0x43066b4557cCfa5a25f77f151a871Dd591C0f2F5', // TODO: Update when deployed to mainnet
+  [base.id]: '0x8AFAA299F9CB43F64A2C2b5aa0acC1d92FfF3595', // Base Mainnet (deployed)
 };
 
 export const STABLE_ALLOWANCE_TREASURY_IMPL: Record<number, `0x${string}`> = {
   [baseSepolia.id]: '0x1d71697D9420f218e75cC2ceb70C255BE1B62550',
-  [base.id]: '0x86CCC5d79bF369FC38d2210138007b66D4Dd8433', // TODO: Update when deployed to mainnet
+  [base.id]: '0x8eb38e1C054D212b153FC28Ae16595fabfe49174', // Base Mainnet (deployed)
 };
 
 // ============================================================================
@@ -96,12 +96,12 @@ export const TERMINATION_NOTICE_PERIOD = 30 * 24 * 60 * 60; // 30 days in second
 export const CHAIN_CONFIG = {
   [base.id]: {
     name: 'Base',
-    rpcUrl: process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://mainnet.base.org',
+    rpcUrl: process.env.NEXT_PUBLIC_BASE_MAINNET_RPC_URL || 'https://mainnet.base.org',
     blockExplorer: 'https://basescan.org',
   },
   [baseSepolia.id]: {
     name: 'Base Sepolia',
-    rpcUrl: 'https://sepolia.base.org',
+    rpcUrl: process.env.NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL || 'https://sepolia.base.org',
     blockExplorer: 'https://sepolia.basescan.org',
   },
 } as const;

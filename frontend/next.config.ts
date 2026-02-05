@@ -6,7 +6,8 @@ import path from 'path';
 dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Transpile LI.FI packages for Next.js compatibility
+  transpilePackages: ['@lifi/widget', '@lifi/sdk'],
 };
 
 export default nextConfig;
