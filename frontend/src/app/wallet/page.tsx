@@ -19,6 +19,14 @@ const SUPPORTED_CHAINS = [
   { id: 42161, name: 'Arbitrum', supported: false },
 ];
 
+// Helper to extract balance value from wagmi's useBalance return type
+const getBalanceValue = (data: unknown): bigint | undefined => {
+  if (data && typeof data === 'object' && 'value' in data) {
+    return (data as { value: bigint }).value;
+  }
+  return undefined;
+};
+
 export default function WalletPage() {
   const { address, isConnected } = useAccount();
   const { networkMode } = useNetworkMode();
@@ -158,7 +166,7 @@ export default function WalletPage() {
                   <>
                     <BalanceCard
                       token="ETH"
-                      balance={balances.mainnet.base.eth.data?.value}
+                      balance={getBalanceValue(balances.mainnet.base.eth.data)}
                       decimals={18}
                       chainName="Base"
                       isLoading={balances.mainnet.base.eth.isLoading}
@@ -167,7 +175,7 @@ export default function WalletPage() {
                     />
                     <BalanceCard
                       token="USDC"
-                      balance={balances.mainnet.base.usdc.data?.value}
+                      balance={getBalanceValue(balances.mainnet.base.usdc.data)}
                       decimals={6}
                       chainName="Base"
                       isLoading={balances.mainnet.base.usdc.isLoading}
@@ -181,7 +189,7 @@ export default function WalletPage() {
                   <>
                     <BalanceCard
                       token="ETH"
-                      balance={balances.mainnet.ethereum.eth.data?.value}
+                      balance={getBalanceValue(balances.mainnet.ethereum.eth.data)}
                       decimals={18}
                       chainName="Ethereum"
                       isLoading={balances.mainnet.ethereum.eth.isLoading}
@@ -190,7 +198,7 @@ export default function WalletPage() {
                     />
                     <BalanceCard
                       token="USDC"
-                      balance={balances.mainnet.ethereum.usdc.data?.value}
+                      balance={getBalanceValue(balances.mainnet.ethereum.usdc.data)}
                       decimals={6}
                       chainName="Ethereum"
                       isLoading={balances.mainnet.ethereum.usdc.isLoading}
@@ -205,7 +213,7 @@ export default function WalletPage() {
                 {/* Testnet - Base Sepolia */}
                 <BalanceCard
                   token="ETH"
-                  balance={balances.testnet.baseSepolia.eth.data?.value}
+                  balance={getBalanceValue(balances.testnet.baseSepolia.eth.data)}
                   decimals={18}
                   chainName="Base Sepolia"
                   isLoading={balances.testnet.baseSepolia.eth.isLoading}
@@ -214,7 +222,7 @@ export default function WalletPage() {
                 />
                 <BalanceCard
                   token="USDC"
-                  balance={balances.testnet.baseSepolia.usdc.data?.value}
+                  balance={getBalanceValue(balances.testnet.baseSepolia.usdc.data)}
                   decimals={6}
                   chainName="Base Sepolia"
                   isLoading={balances.testnet.baseSepolia.usdc.isLoading}

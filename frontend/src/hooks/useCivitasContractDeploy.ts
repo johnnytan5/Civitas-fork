@@ -134,18 +134,7 @@ export function useCivitasContractDeploy() {
     setEnsName(null);
     setEnsError(null);
 
-    // Persist deployment intent to localStorage BEFORE deploying
-    const pendingDeployment: PendingDeployment = {
-      landlord: address,
-      tenant: address, // For recovery purposes
-      monthlyAmount: '0', // Not applicable for all templates
-      totalMonths: 0,
-      basename: template, // Use template name as identifier
-      timestamp: Date.now(),
-    };
-
-    persistPendingDeployment(pendingDeployment);
-    console.log('💾 Persisted pending deployment to localStorage');
+    // Note: We persist deployment after getting txHash in writeContract callback
 
     // Deploy based on template
     let functionName: string;
@@ -186,7 +175,7 @@ export function useCivitasContractDeploy() {
           address: factoryAddress,
           abi: CIVITAS_FACTORY_ABI,
           functionName: functionName as any,
-          args,
+          args: args as any,
           account: address,
         });
         console.log('✅ Pre-simulation successful!');
@@ -202,7 +191,7 @@ export function useCivitasContractDeploy() {
         address: factoryAddress,
         abi: CIVITAS_FACTORY_ABI,
         functionName: functionName as any,
-        args,
+        args: args as any,
       });
     } catch (error: any) {
       console.error('❌ Write contract error:', error);
@@ -424,7 +413,9 @@ export function useCivitasContractDeploy() {
             console.log(`📝 Found event: ${decoded.eventName}`);
 
             if (decoded.eventName === eventName) {
-              contractAddress = decoded.args.clone as `0x${string}`;
+              // Different events use different property names for the deployed address
+              const args = decoded.args as any;
+              contractAddress = (args.clone || args.contractAddress) as `0x${string}`;
               console.log(`📍 Found ${eventName} event, contract deployed at:`, contractAddress);
               break;
             }

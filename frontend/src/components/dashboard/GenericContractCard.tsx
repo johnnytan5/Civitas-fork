@@ -7,7 +7,7 @@ import type { ContractTemplate } from '@/lib/contracts/constants';
 interface GenericContract {
   id: string;
   contract_address: string;
-  template_id: ContractTemplate;
+  template_id: string;
   creator_address: string;
   chain_id: number;
   state: number;
@@ -15,6 +15,8 @@ interface GenericContract {
   config: any;
   on_chain_state: any | null;
   created_at: string | null;
+  updated_at?: string | null;
+  last_synced_at?: string | null;
 }
 
 interface GenericContractCardProps {
@@ -23,7 +25,7 @@ interface GenericContractCardProps {
 }
 
 export function GenericContractCard({ contract, onClick }: GenericContractCardProps) {
-  const templateInfo = getTemplateInfo(contract.template_id);
+  const templateInfo = getTemplateInfo(contract.template_id as ContractTemplate);
   const stateInfo = getContractState(contract.state);
 
   // Map state to bg colors matching the brutal style

@@ -10,6 +10,7 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const userAddress = searchParams.get('user_address');
     const eventType = searchParams.get('event_type');
+    const contractAddress = searchParams.get('contract_address');
 
     if (!userAddress) {
       return NextResponse.json(
@@ -20,27 +21,40 @@ export async function GET(request: NextRequest) {
 
     const supabase = createClient<Database>(supabaseUrl, supabaseServiceKey);
 
-    // Build query to fetch contract events for user's contracts
+    // query contract_transactions joined with contracts and contract_participants
     let query = supabase
-      .from('contract_events')
+      .from('contract_transactions')
       .select(`
         *,
-        rental_contracts!inner(
-          basename,
+        contracts!inner(
+          id,
           contract_address,
-          user_contracts!inner(
-            role,
-            user_address
+          template_id,
+          basename,
+          contract_participants!inner(
+            user_address,
+            role
           )
         )
       `)
-      .eq('rental_contracts.user_contracts.user_address', userAddress)
-      .order('created_at', { ascending: false })
+      .eq('contracts.contract_participants.user_address', userAddress.toLowerCase())
+      .order('block_timestamp', { ascending: false })
       .limit(50);
 
-    // Filter by event type if provided
+    // Filter by contract_address if provided
+    if (contractAddress) {
+      query = query.eq('contract_address', contractAddress.toLowerCase());
+    }
+
+    // Filter by transaction_type (mapped from frontend event_type)
     if (eventType && eventType !== 'all') {
-      query = query.eq('event_type', eventType);
+      // mapping frontend filter values to database transaction_type values if necessary
+      // assuming 1:1 mapping for now, or 'created' -> 'deployment'
+      if (eventType === 'created') {
+        query = query.eq('transaction_type', 'deployment');
+      } else {
+        query = query.eq('transaction_type', eventType);
+      }
     }
 
     const { data, error, count } = await query;
@@ -54,16 +68,18 @@ export async function GET(request: NextRequest) {
     }
 
     // Transform data to flatten structure
-    const transactions = data?.map((event: any) => ({
-      id: event.id,
-      event_type: event.event_type,
-      contract_address: event.contract_address,
-      basename: event.rental_contracts?.basename || null,
-      transaction_hash: event.transaction_hash,
-      block_number: event.block_number,
-      event_data: event.event_data,
-      created_at: event.created_at,
-      role: event.rental_contracts?.user_contracts?.[0]?.role || null,
+    const transactions = data?.map((tx: any) => ({
+      id: tx.id,
+      event_type: tx.transaction_type, // Map back to event_type
+      contract_address: tx.contract_address,
+      basename: tx.contracts?.basename || null,
+      transaction_hash: tx.transaction_hash,
+      block_number: tx.block_number,
+      event_data: tx.event_data,
+      created_at: tx.block_timestamp, // Use block_timestamp
+      role: tx.contracts?.contract_participants?.[0]?.role || null,
+      from_address: tx.from_address || null,
+      template_id: tx.contracts?.template_id || null,
     })) || [];
 
     return NextResponse.json({
