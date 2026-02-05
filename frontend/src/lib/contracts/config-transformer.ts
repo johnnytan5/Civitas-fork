@@ -27,6 +27,74 @@ export interface ENSResolutionReport {
 }
 
 /**
+ * Check if a string is a "me" reference (case-insensitive)
+ */
+function isMeReference(value: string): boolean {
+  return value.toLowerCase() === 'me';
+}
+
+/**
+ * Resolve all "me" references in config to walletAddress
+ * Must be called BEFORE ENS resolution
+ */
+export function resolveMeReferences(
+  templateId: string,
+  config: any,
+  walletAddress: `0x${string}` | undefined
+): any {
+  const resolvedConfig = JSON.parse(JSON.stringify(config));
+
+  const replaceMeIfNeeded = (value: string | undefined): string | undefined => {
+    if (!value) return value;
+    if (isMeReference(value)) {
+      if (!walletAddress) {
+        throw new Error(
+          'Cannot resolve "me" reference: wallet not connected. ' +
+          'Please connect your wallet to use "me" in contract configuration.'
+        );
+      }
+      return walletAddress;
+    }
+    return value;
+  };
+
+  switch (templateId) {
+    case 'rent-vault': {
+      const c = resolvedConfig as RentVaultConfig;
+      c.recipient = replaceMeIfNeeded(c.recipient);
+      if (c.tenants) {
+        c.tenants = c.tenants.map((tenant: string) => {
+          const replaced = replaceMeIfNeeded(tenant);
+          if (!replaced) throw new Error('Tenant address cannot be empty after resolution');
+          return replaced;
+        });
+      }
+      break;
+    }
+    case 'group-buy-escrow': {
+      const c = resolvedConfig as GroupBuyEscrowConfig;
+      c.recipient = replaceMeIfNeeded(c.recipient);
+      if (c.participants) {
+        c.participants = c.participants.map((participant: string) => {
+          const replaced = replaceMeIfNeeded(participant);
+          if (!replaced) throw new Error('Participant address cannot be empty after resolution');
+          return replaced;
+        });
+      }
+      break;
+    }
+    case 'stable-allowance-treasury': {
+      const c = resolvedConfig as StableAllowanceTreasuryConfig;
+      c.owner = replaceMeIfNeeded(c.owner);
+      c.recipient = replaceMeIfNeeded(c.recipient);
+      break;
+    }
+  }
+
+  return resolvedConfig;
+}
+
+/**
  * Extract all address/ENS fields from a config that need resolution
  */
 function extractAddressFields(templateId: string, config: any): string[] {
@@ -323,7 +391,7 @@ export function validateConfig(templateId: string, config: any): string | null {
         return 'Missing required fields';
       }
       if (c.owner.toLowerCase() === c.recipient.toLowerCase()) {
-        return 'Owner and recipient must be different addresses';
+        return 'Owner and recipient must be different addresses. You cannot be both the owner and recipient of an allowance treasury.';
       }
       return null;
     }

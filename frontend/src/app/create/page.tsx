@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { useChainId } from 'wagmi';
+import { useChainId, useAccount } from 'wagmi';
 import { WalletGate } from '@/components/wallet/WalletGate';
 import { useTemplateChat } from '@/hooks/useTemplateChat';
 import { useCivitasContractDeploy } from '@/hooks/useCivitasContractDeploy';
@@ -14,7 +14,13 @@ import { TerminalInput } from '@/components/ui/TerminalInput';
 import { LoadingSquares } from '@/components/ui/LoadingSquares';
 import NavigationRail from '@/components/layout/NavigationRail';
 import MarqueeTicker from '@/components/layout/MarqueeTicker';
-import { transformConfigToDeployParams, validateConfig, resolveConfigENSNames, type ENSResolutionReport } from '@/lib/contracts/config-transformer';
+import {
+  transformConfigToDeployParams,
+  validateConfig,
+  resolveConfigENSNames,
+  resolveMeReferences,
+  type ENSResolutionReport
+} from '@/lib/contracts/config-transformer';
 import { CONTRACT_TEMPLATES, getCivitasEnsDomain, type ContractTemplate } from '@/lib/contracts/constants';
 import { isENSName, formatAddress } from '@/lib/ens/resolver';
 import { LiFiBridgeStep, DirectFundingStep, BalancePoller } from '@/components/deploy';
@@ -23,6 +29,7 @@ import { isLiFiSupported, LIFI_SUPPORTED_CHAIN_IDS } from '@/lib/lifi';
 export default function CreatePage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chainId = useChainId();
+  const { address: walletAddress } = useAccount();
   const ensDomain = getCivitasEnsDomain(chainId);
   const {
     messages,
@@ -78,10 +85,10 @@ export default function CreatePage() {
       return;
     }
 
-    // Validate config
-    const validationError = validateConfig(activeTemplate.id, extractedConfig);
-    if (validationError) {
-      setDeploymentError(validationError);
+    // Step 0: Initial validation (basic fields)
+    const initialValidationError = validateConfig(activeTemplate.id, extractedConfig);
+    if (initialValidationError) {
+      setDeploymentError(initialValidationError);
       return;
     }
 
@@ -89,9 +96,18 @@ export default function CreatePage() {
       setDeploymentError(null);
       setEnsResolutionReport(null);
 
-      // Step 1: Resolve any ENS names in the config
+      // Step 1: Resolve "me" references to walletAddress
+      let resolvedConfig;
+      try {
+        resolvedConfig = resolveMeReferences(activeTemplate.id, extractedConfig, walletAddress);
+      } catch (error: any) {
+        setDeploymentError(error.message || 'Failed to resolve "me" references');
+        return;
+      }
+
+      // Step 2: Resolve any ENS names in the config
       setIsResolvingENS(true);
-      const resolutionReport = await resolveConfigENSNames(activeTemplate.id, extractedConfig);
+      const resolutionReport = await resolveConfigENSNames(activeTemplate.id, resolvedConfig);
       setIsResolvingENS(false);
       setEnsResolutionReport(resolutionReport);
 
@@ -99,6 +115,13 @@ export default function CreatePage() {
         setDeploymentError(
           `ENS Resolution Failed:\n${resolutionReport.errors.join('\n')}\n\nPlease use valid ENS names or raw Ethereum addresses (0x...).`
         );
+        return;
+      }
+
+      // Step 3: Final validation with fully resolved addresses (e.g. owner != recipient checks)
+      const finalValidationError = validateConfig(activeTemplate.id, resolutionReport.resolvedConfig);
+      if (finalValidationError) {
+        setDeploymentError(finalValidationError);
         return;
       }
 
