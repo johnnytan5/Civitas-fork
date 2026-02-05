@@ -20,9 +20,6 @@ export function useTemplateChat() {
   const [extractedConfig, setExtractedConfig] = useState<any>({});
   const [configCompleteness, setConfigCompleteness] = useState(0);
   const [isExtracting, setIsExtracting] = useState(false);
-  const [input, setInput] = useState('');
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
 
   // Detect user's timezone from browser
   const timezone = useUserTimezone();
@@ -34,7 +31,7 @@ export function useTemplateChat() {
   // Active template is manual selection or AI detection
   const activeTemplate = manualTemplate || detectedTemplate;
 
-  const { messages, setMessages, status } = useChat({
+  const { messages, setMessages, input, setInput, handleInputChange, handleSubmit, status } = useChat({
     api: '/api/chat',
     body: {
       templateId: activeTemplate?.id,
