@@ -27,6 +27,7 @@ export default function CreatePage() {
   const {
     messages,
     input,
+    setInput,
     handleInputChange,
     handleSubmit,
     isLoading,
@@ -69,7 +70,7 @@ export default function CreatePage() {
   }, [messages]);
 
   const onSubmit = () => {
-    handleSubmit(new Event('submit') as any);
+    handleSubmit();
   };
 
   const handleDeploy = async () => {
@@ -187,14 +188,13 @@ export default function CreatePage() {
                   {/* Show messages if there's a conversation */}
                   {messages.length > 0 && (
                     <div className="p-8 border-b-[3px] border-black pattern-grid">
-                      {messages.map((message) => {
-                        const extractedText = getMessageText(message);
+                      {messages.map((message, index) => {
+                        const isLastMessage = index === messages.length - 1;
                         return (
                           <div key={message.id} className="relative z-10">
                             <ChatBubble
-                              role={message.role === 'user' ? 'user' : 'agent'}
-                              message={extractedText}
-                              isLoading={isLoading}
+                              message={message}
+                              isLoading={isLoading && isLastMessage && message.role === 'assistant'}
                             />
                           </div>
                         );
@@ -267,14 +267,13 @@ export default function CreatePage() {
                     </div>
                   )}
 
-                  {messages.map((message) => {
-                    const extractedText = getMessageText(message);
+                  {messages.map((message, index) => {
+                    const isLastMessage = index === messages.length - 1;
                     return (
                       <div key={message.id} className="relative z-10">
                         <ChatBubble
-                          role={message.role === 'user' ? 'user' : 'agent'}
-                          message={extractedText}
-                          isLoading={isLoading}
+                          message={message}
+                          isLoading={isLoading && isLastMessage && message.role === 'assistant'}
                         />
                       </div>
                     );

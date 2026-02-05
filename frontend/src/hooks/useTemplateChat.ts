@@ -1,6 +1,7 @@
 'use client';
 
 import { useChat } from '@ai-sdk/react';
+import { DefaultChatTransport } from 'ai';
 import { useState, useEffect } from 'react';
 import { useAccount } from 'wagmi';
 import { templateRegistry } from '@/lib/templates/registry';
@@ -17,37 +18,45 @@ export function useTemplateChat() {
 
   // Detect user's timezone from browser
   const timezone = useUserTimezone();
-  
+
   // Get connected wallet address
   const { address: walletAddress } = useAccount();
 
   // Active template is manual selection or AI detection
   const activeTemplate = manualTemplate || detectedTemplate;
 
-  const { messages, setMessages, status } = useChat({
-    api: '/api/chat',
-    body: {
-      templateId: activeTemplate?.id,
-      timezone, // Pass timezone to API
-      walletAddress, // Pass connected wallet address
-    },
+  const { messages, setMessages, sendMessage, status } = useChat({
+    transport: new DefaultChatTransport({
+      api: '/api/chat',
+      body: {
+        templateId: activeTemplate?.id,
+        timezone, // Pass timezone to API
+        walletAddress, // Pass connected wallet address
+      },
+    }),
   });
 
   const isLoading = status !== 'ready';
 
-  // Helper to extract text from message content
+  // Custom wrapper to bridge TerminalInput's (value: string) => void signature
+  // with the string state management. TerminalInput extracts e.target.value
+  // and passes the string to this function.
+  const handleInputChange = (value: string) => {
+    setInput(value);
+  };
+
+  const handleSubmit = () => {
+    if (!input.trim()) return;
+    sendMessage({ text: input });
+    setInput('');
+  };
+
+  // Helper to extract text from message parts
   const getMessageText = (message: typeof messages[number]) => {
-    if (typeof message.content === 'string') {
-      return message.content;
-    }
-    // Handle array of content parts
-    if (Array.isArray(message.content)) {
-      return message.content
-        .filter(part => part.type === 'text')
-        .map(part => part.text)
-        .join(' ');
-    }
-    return '';
+    return message.parts
+      .filter(part => part.type === 'text')
+      .map(part => (part as any).text)
+      .join(' ');
   };
 
   // Auto-detect template from first user message
@@ -108,93 +117,13 @@ export function useTemplateChat() {
     }
   };
 
-  const handleInputChange = (value: string) => {
-    setInput(value);
+  // Helper functions for extracting tool data from messages
+  const getMessageToolCalls = (message: typeof messages[number]) => {
+    return message.parts.filter((part: any) => part.type === 'tool-call');
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim()) return;
-
-    const userMessage = input;
-    setInput(''); // Clear input immediately
-
-    // Add user message to the messages array
-    const newUserMessage = {
-      id: Date.now().toString(),
-      role: 'user' as const,
-      content: userMessage,
-    };
-    
-    const updatedMessages = [...messages, newUserMessage];
-    setMessages(updatedMessages);
-
-    // Call the API to get AI response
-    try {
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: updatedMessages,
-          templateId: activeTemplate?.id,
-          timezone, // Pass timezone for temporal context
-          walletAddress, // Pass wallet address
-        }),
-      });
-
-      if (!response.ok || !response.body) {
-        const errorText = await response.text();
-        console.error('Chat API error:', errorText);
-        throw new Error('Chat API failed');
-      }
-
-      // Handle streaming response
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let assistantMessage = '';
-      const assistantId = (Date.now() + 1).toString();
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n').filter(line => line.trim() !== '');
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6); // Remove 'data: ' prefix
-            
-            // Skip [DONE] marker
-            if (data === '[DONE]') continue;
-            
-            try {
-              const parsed = JSON.parse(data);
-              
-              // Handle text delta chunks
-              if (parsed.type === 'text-delta' && parsed.delta) {
-                assistantMessage += parsed.delta;
-                
-                // Update messages with streaming content
-                setMessages([
-                  ...updatedMessages,
-                  {
-                    id: assistantId,
-                    role: 'assistant' as const,
-                    content: assistantMessage,
-                  },
-                ]);
-              }
-            } catch (e) {
-              // Skip invalid JSON
-              console.warn('Failed to parse streaming chunk:', data);
-            }
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Chat error:', error);
-    }
+  const getMessageToolResults = (message: typeof messages[number]) => {
+    return message.parts.filter((part: any) => part.type === 'tool-result');
   };
 
   const handleTemplateSelect = (templateId: string) => {
@@ -211,8 +140,7 @@ export function useTemplateChat() {
     setManualTemplate(null);
     setExtractedConfig({});
     setConfigCompleteness(0);
-    setInput('');
-    // Note: useChat doesn't expose a reset method, so we rely on page navigation
+    setMessages([]);
   };
 
   const isConfigComplete = configCompleteness === 100;
@@ -221,6 +149,7 @@ export function useTemplateChat() {
     // Chat state
     messages,
     input,
+    setInput,
     handleInputChange,
     handleSubmit,
     isLoading,
@@ -242,5 +171,7 @@ export function useTemplateChat() {
     
     // Helpers
     getMessageText,
+    getMessageToolCalls,
+    getMessageToolResults,
   };
 }

@@ -1,4 +1,4 @@
-import { getUserContracts, updateContract } from './contracts'
+import { getUserContracts, updateGenericContract } from './generic-contracts'
 import { getOrCreateUser } from './users'
 import type { Database } from './types'
 
@@ -29,7 +29,7 @@ export async function syncContractFromBlockchain(
   }
 
   // Update contract in database
-  const updated = await updateContract(contractAddress, {
+  const updated = await updateGenericContract(contractAddress, {
     landlord_address: blockchainData.landlord,
     tenant_address: blockchainData.tenant !== '0x0000000000000000000000000000000000000000'
       ? blockchainData.tenant

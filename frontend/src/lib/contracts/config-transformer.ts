@@ -205,14 +205,14 @@ export function transformConfigToDeployParams(
       const c = config as RentVaultConfig;
       
       // Parse rent amount (could be string with commas or just a number string)
-      const rentAmountStr = c.rentAmount.replace(/,/g, '');
+      const rentAmountStr = (c.rentAmount || '0').replace(/,/g, '');
       const rentAmount = parseUnits(rentAmountStr, 6);
       
       // Parse due date with validation
-      const dueDate = parseDateToBigInt(c.dueDate, 'due date');
+      const dueDate = parseDateToBigInt(c.dueDate || '', 'due date');
       
       // Convert shareBps to bigint array
-      const shareBps = c.shareBps.map(s => BigInt(s));
+      const shareBps = (c.shareBps || []).map(s => BigInt(s));
       
       return {
         recipient: c.recipient as `0x${string}`,
@@ -227,15 +227,15 @@ export function transformConfigToDeployParams(
       const c = config as GroupBuyEscrowConfig;
       
       // Parse funding goal
-      const fundingGoalStr = c.fundingGoal.replace(/,/g, '');
+      const fundingGoalStr = (c.fundingGoal || '0').replace(/,/g, '');
       const fundingGoal = parseUnits(fundingGoalStr, 6);
-      
+
       // Parse expiry date with validation
-      const expiryDate = parseDateToBigInt(c.expiryDate, 'expiry date');
-      
+      const expiryDate = parseDateToBigInt(c.expiryDate || '', 'expiry date');
+
       // Parse timelock delay (could be in days, convert to seconds)
       let timelockRefundDelay: bigint;
-      const delayStr = c.timelockRefundDelay.replace(/,/g, '');
+      const delayStr = (c.timelockRefundDelay || '0').replace(/,/g, '');
       const delayNum = parseFloat(delayStr);
       // If less than 1000, assume days and convert to seconds
       if (delayNum < 1000) {
@@ -245,7 +245,7 @@ export function transformConfigToDeployParams(
       }
       
       // Convert shareBps to bigint array
-      const shareBps = c.shareBps.map(s => BigInt(s));
+      const shareBps = (c.shareBps || []).map(s => BigInt(s));
       
       return {
         recipient: c.recipient as `0x${string}`,
@@ -261,7 +261,7 @@ export function transformConfigToDeployParams(
       const c = config as StableAllowanceTreasuryConfig;
       
       // Parse allowance amount
-      const allowanceStr = c.allowancePerIncrement.replace(/,/g, '');
+      const allowanceStr = (c.allowancePerIncrement || '0').replace(/,/g, '');
       const allowancePerIncrement = parseUnits(allowanceStr, 6);
       
       return {

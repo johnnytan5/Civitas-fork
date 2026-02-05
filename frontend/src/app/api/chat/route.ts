@@ -1,6 +1,7 @@
-import { streamText } from 'ai';
+import { streamText, stepCountIs, convertToModelMessages } from 'ai';
 import { getGoogleProvider } from '@/lib/ai/google-provider';
 import { getTemplatePrompt } from '@/lib/ai/prompts';
+import { civitasTools } from '@/lib/ai/tools';
 import type { TimezoneInfo } from '@/hooks/useUserTimezone';
 
 export const runtime = 'edge';
@@ -20,7 +21,7 @@ export async function POST(req: Request) {
 
     // Get the appropriate system prompt based on template (with timezone and wallet context)
     const systemPrompt = getTemplatePrompt(
-      templateId || null, 
+      templateId || null,
       timezone as TimezoneInfo | undefined,
       walletAddress as string | undefined
     );
@@ -28,11 +29,16 @@ export async function POST(req: Request) {
     // Get configured provider (local proxy in dev, official API in production)
     const google = getGoogleProvider();
 
-    // Pass messages directly - the AI SDK handles conversion internally
+    // Convert UI messages to model messages (async function)
+    const modelMessages = await convertToModelMessages(messages);
+
+    // Pass converted messages to streamText
     const result = streamText({
       model: google('gemini-2.5-flash'),
       system: systemPrompt,
-      messages: messages as any,
+      messages: modelMessages,
+      tools: civitasTools,
+      stopWhen: stepCountIs(5),
     });
 
     return result.toUIMessageStreamResponse();
