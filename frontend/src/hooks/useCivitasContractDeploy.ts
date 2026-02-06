@@ -62,6 +62,7 @@ export function useCivitasContractDeploy() {
   const [isStoring, setIsStoring] = useState(false);
   const [deploymentParams, setDeploymentParams] = useState<DeploymentParams | null>(null);
   const [hasStored, setHasStored] = useState(false);
+  const [customBasename, setCustomBasename] = useState<string | null>(null);
 
   // ENS state
   const [ensStep, setEnsStep] = useState<EnsStep>('idle');
@@ -143,7 +144,11 @@ export function useCivitasContractDeploy() {
   /**
    * Deploy contract based on selected template
    */
-  const deployContract = async (template: ContractTemplate, params: DeploymentParams) => {
+  const deployContract = async (
+    template: ContractTemplate,
+    params: DeploymentParams,
+    customBasename?: string | null
+  ) => {
     if (!address) {
       throw new Error('Wallet not connected');
     }
@@ -158,6 +163,7 @@ export function useCivitasContractDeploy() {
     setDeployedAddress(null);
     setSelectedTemplate(template);
     setDeploymentParams(params);
+    setCustomBasename(customBasename || null);
     setEnsStep('idle');
     setEnsName(null);
     setEnsError(null);
@@ -293,48 +299,59 @@ export function useCivitasContractDeploy() {
     }
 
     try {
-      // Step 1: Generate name via AI
-      setEnsStep('generating');
-      console.log('🏷️ Generating ENS name...');
+      let basename: string;
 
-      const nameResponse = await fetch('/api/generate-name', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          templateId: template,
-          config,
-        }),
-      });
+      // DECISION POINT: Use custom basename or generate via AI
+      if (customBasename) {
+        // Use user's custom basename
+        console.log('🏷️ Using custom basename:', customBasename);
+        basename = customBasename;
+        setEnsStep('registering'); // Skip "generating" step
+      } else {
+        // Step 1: Generate name via AI
+        setEnsStep('generating');
+        console.log('🏷️ Generating ENS name...');
 
-      if (!nameResponse.ok) {
-        throw new Error('Failed to generate ENS name');
+        const nameResponse = await fetch('/api/generate-name', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            templateId: template,
+            config,
+          }),
+        });
+
+        if (!nameResponse.ok) {
+          throw new Error('Failed to generate ENS name');
+        }
+
+        const { suggestedName } = await nameResponse.json();
+        console.log('🏷️ Generated name:', suggestedName);
+        basename = suggestedName;
+        setEnsStep('registering');
       }
-
-      const { suggestedName } = await nameResponse.json();
-      console.log('🏷️ Generated name:', suggestedName);
 
       // Step 2: Build records
       const { keys, values } = buildENSRecords(template, params, address);
 
       // Step 3: Call factory to register subdomain
-      setEnsStep('registering');
       console.log('📝 Registering ENS subdomain...');
 
       writeEnsContract({
         address: factoryAddress,
         abi: CIVITAS_FACTORY_ABI,
         functionName: 'createSubdomainAndSetRecords',
-        args: [contractAddress, suggestedName, keys, values],
+        args: [contractAddress, basename, keys, values],
       });
 
       // Store the suggested name for later (we'll get the full name from the event)
-      setEnsName(suggestedName);
+      setEnsName(basename);
     } catch (error: any) {
       console.error('❌ ENS registration error:', error);
       setEnsError(error.message || 'Failed to register ENS name');
       setEnsStep('skipped');
     }
-  }, [chainId, address, buildENSRecords, writeEnsContract]);
+  }, [chainId, address, customBasename, buildENSRecords, writeEnsContract]);
 
   /**
    * Handle ENS transaction confirmation

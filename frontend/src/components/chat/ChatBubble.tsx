@@ -12,19 +12,31 @@ interface ChatBubbleProps {
 }
 
 /**
- * Extract text content from message parts
+ * Extract text content from message parts or content string
  */
 function getMessageText(message: UIMessage): string {
-  return message.parts
-    .filter((part) => part.type === 'text')
-    .map((part) => (part as any).text)
-    .join('');
+  // Cast to any to handle potential content string property not in UIMessage type
+  const msg = message as any;
+  if (typeof msg.content === 'string') {
+    return msg.content;
+  }
+
+  if (message.parts) {
+    return message.parts
+      .filter((part) => part.type === 'text')
+      .map((part) => (part as any).text)
+      .join('');
+  }
+
+  return '';
 }
 
 /**
  * Extract tool invocations from message parts
  */
 function getToolInvocations(message: UIMessage) {
+  if (!message.parts) return [];
+
   return message.parts.filter(
     (part) => part.type === 'tool-call' || part.type === 'tool-result'
   );
@@ -40,11 +52,10 @@ export function ChatBubble({ message, timestamp, isLoading = false }: ChatBubble
       <div className="relative max-w-prose">
         {/* Chat bubble container */}
         <div
-          className={`px-6 py-4 border-[3px] border-black break-words ${
-            isUser
-              ? 'bg-hot-pink shadow-[3px_3px_0px_#000]'
-              : 'bg-stark-white shadow-[3px_3px_0px_#000]'
-          }`}
+          className={`px-6 py-4 border-[3px] border-black break-words ${isUser
+            ? 'bg-hot-pink shadow-[3px_3px_0px_#000]'
+            : 'bg-stark-white shadow-[3px_3px_0px_#000]'
+            }`}
         >
           {isUser ? (
             <p className="text-base font-black text-black leading-relaxed whitespace-pre-wrap">

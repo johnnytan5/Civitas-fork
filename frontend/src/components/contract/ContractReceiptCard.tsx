@@ -11,6 +11,7 @@ interface ContractReceiptCardProps {
   template: TemplateDefinition
   config: any
   onDeploy?: () => void
+  onBasenameChange?: (basename: string | null) => void
   isDeploying?: boolean
   isSuccess?: boolean
   deployedAddress?: string
@@ -20,6 +21,7 @@ export function ContractReceiptCard({
   template,
   config,
   onDeploy,
+  onBasenameChange,
   isDeploying = false,
   isSuccess = false,
   deployedAddress,
@@ -27,6 +29,9 @@ export function ContractReceiptCard({
   const [completeness, setCompleteness] = useState(0)
   const [isPressed, setIsPressed] = useState(false)
   const [isFlipped, setIsFlipped] = useState(false)
+  const [customizeBasename, setCustomizeBasename] = useState(false)
+  const [customBasename, setCustomBasename] = useState('')
+  const [basenameError, setBasenameError] = useState<string | null>(null)
 
   // Generate stable random barcode heights
   const barcodeHeights = useMemo(() =>
@@ -55,6 +60,26 @@ export function ContractReceiptCard({
       : 0
     setCompleteness(percentage)
   }, [config, template])
+
+  // Notify parent of basename changes
+  useEffect(() => {
+    if (onBasenameChange) {
+      if (customizeBasename && customBasename) {
+        // Simple regex for immediate feedback (more rigorous check on deploy)
+        const isValid = /^[a-z0-9]([a-z0-9-]{1,28}[a-z0-9])?$/.test(customBasename)
+        if (!isValid) {
+          setBasenameError('Use lowercase letters, numbers, and hyphens (3-30 chars).')
+          onBasenameChange(null) // Don't pass invalid names
+        } else {
+          setBasenameError(null)
+          onBasenameChange(customBasename)
+        }
+      } else {
+        setBasenameError(null)
+        onBasenameChange(null)
+      }
+    }
+  }, [customizeBasename, customBasename, onBasenameChange])
 
   const formatValue = (field: any, value: any) => {
     if (!value && value !== 0) return '---'
@@ -267,8 +292,8 @@ export function ContractReceiptCard({
                 </div>
 
                 {/* Barcode (Stable) */}
-                <div className="p-6 flex justify-center">
-                  <div className="flex gap-[2px] h-12">
+                <div className="p-6 flex justify-center flex-col items-center">
+                  <div className="flex gap-[2px] h-12 mb-6">
                     {barcodeHeights.map((height, i) => (
                       <div
                         key={i}
@@ -277,6 +302,60 @@ export function ContractReceiptCard({
                       />
                     ))}
                   </div>
+
+                  {/* Basename Customization Section */}
+                  {!isSuccess && (
+                    <div className="w-full border-t border-dashed border-black pt-4">
+                      <button
+                        onClick={() => setCustomizeBasename(!customizeBasename)}
+                        className="flex items-center gap-2 text-xs font-mono font-bold uppercase hover:underline mb-2"
+                      >
+                        {customizeBasename ? (
+                          <div className="w-4 h-4 border border-black bg-black flex items-center justify-center">
+                            <CheckCircle2 className="w-3 h-3 text-white" />
+                          </div>
+                        ) : (
+                          <div className="w-4 h-4 border border-black bg-white" />
+                        )}
+                        Customize Basename (Optional)
+                      </button>
+
+                      {customizeBasename && (
+                        <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                          <div className="relative">
+                            <input
+                              type="text"
+                              value={customBasename}
+                              onChange={(e) => {
+                                setCustomBasename(e.target.value.toLowerCase())
+                              }}
+                              placeholder="my-contract-name"
+                              className={`
+                                w-full px-3 py-2 bg-white border border-black
+                                font-mono text-sm placeholder:text-gray-300
+                                focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-1
+                                ${basenameError ? 'border-red-500 bg-red-50' : ''}
+                              `}
+                            />
+                            <div className="absolute right-3 top-2.5 text-xs text-gray-400 font-mono pointer-events-none">
+                              .civitas...
+                            </div>
+                          </div>
+
+                          {basenameError ? (
+                            <div className="flex items-start gap-1 text-[10px] text-red-600 font-mono font-bold">
+                              <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                              <span>{basenameError}</span>
+                            </div>
+                          ) : (
+                            <p className="text-[10px] text-gray-500 font-mono">
+                              Final: {customBasename || 'your-name'}-xxxxxxxx.civitas...
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

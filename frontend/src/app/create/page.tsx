@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useChainId, useAccount } from 'wagmi';
 import { WalletGate } from '@/components/wallet/WalletGate';
 import { useTemplateChat } from '@/hooks/useTemplateChat';
@@ -45,6 +45,7 @@ export default function CreatePage() {
     configCompleteness,
     isConfigComplete,
     getMessageText,
+    append,
   } = useTemplateChat();
 
   const {
@@ -63,6 +64,8 @@ export default function CreatePage() {
   const [deploymentError, setDeploymentError] = useState<string | null>(null);
   const [ensResolutionReport, setEnsResolutionReport] = useState<ENSResolutionReport | null>(null);
   const [isResolvingENS, setIsResolvingENS] = useState(false);
+  const [customBasename, setCustomBasename] = useState<string | null>(null);
+  const [isValidatingBasename, setIsValidatingBasename] = useState(false);
 
   const allTemplates = templateRegistry.getAll();
 
@@ -71,8 +74,57 @@ export default function CreatePage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const onSubmit = () => {
-    handleSubmit();
+  const onSubmit = async () => {
+    console.log('[CreatePage] onSubmit called', { input, hasAppend: !!append, hasSetInput: !!setInput });
+    if (!input.trim()) {
+      console.log('[CreatePage] input empty, ignoring');
+      return;
+    }
+
+    try {
+      // Clear input immediately to prevent double submission and improve UX
+      const currentInput = input;
+      if (typeof setInput === 'function') {
+        setInput('');
+      } else {
+        console.warn('[CreatePage] setInput is not a function');
+      }
+
+      // Use append directly instead of handleSubmit
+      console.log('[CreatePage] calling append with:', currentInput);
+      await append({
+        role: 'user',
+        content: currentInput,
+      });
+      console.log('[CreatePage] append completed successfully');
+    } catch (error) {
+      console.error('[CreatePage] Failed to send message:', error);
+      // Optionally restore input on error?
+      // For now, let's just log it.
+      // If we restore it, we might get into a loop if it keeps failing.
+    }
+  };
+
+  // Adapter for TerminalInput which passes raw string value
+  // We include defensive checks because useChat return values can vary by version/state
+  const handleTerminalInputChange = (value: string) => {
+    // Try setInput first (most direct)
+    if (typeof setInput === 'function') {
+      setInput(value);
+      return;
+    }
+
+    // Fallback to handleInputChange with synthetic event
+    if (typeof handleInputChange === 'function') {
+      const event = {
+        target: { value },
+        preventDefault: () => { },
+      } as unknown as React.ChangeEvent<HTMLInputElement>;
+      handleInputChange(event);
+      return;
+    }
+
+    console.warn('No input handler available (setInput or handleInputChange missing)');
   };
 
   const handleDeploy = async () => {
@@ -90,6 +142,44 @@ export default function CreatePage() {
     try {
       setDeploymentError(null);
       setEnsResolutionReport(null);
+
+      // Step 0.5: Validate Custom Basename (if provided)
+      if (customBasename) {
+        setIsValidatingBasename(true);
+        try {
+          // Client-side format validation
+          const basenameRegex = /^[a-z0-9]([a-z0-9-]{1,28}[a-z0-9])?$/;
+          if (!basenameRegex.test(customBasename)) {
+            throw new Error('Invalid basename format. Use lowercase letters, numbers, and hyphens only (3-30 characters).');
+          }
+
+          // Server-side availability check
+          const availabilityResponse = await fetch('/api/check-basename', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              basename: customBasename,
+              chainId: chainId,
+            }),
+          });
+
+          if (!availabilityResponse.ok) {
+            throw new Error('Failed to check basename availability');
+          }
+
+          const { available, suggestion } = await availabilityResponse.json();
+
+          if (!available) {
+            throw new Error(`Basename "${customBasename}" is already taken. ${suggestion ? `Try "${suggestion}" instead.` : ''}`);
+          }
+        } catch (err: any) {
+          setDeploymentError(err.message);
+          setIsValidatingBasename(false);
+          return;
+        } finally {
+          setIsValidatingBasename(false);
+        }
+      }
 
       // Step 1: Resolve "me" references to walletAddress
       let resolvedConfig;
@@ -140,14 +230,14 @@ export default function CreatePage() {
       }
 
       // Deploy contract
-      await deployContract(templateConstant, params);
+      await deployContract(templateConstant, params, customBasename);
     } catch (error: any) {
       console.error('Deployment error:', error);
       setDeploymentError(error.message || 'Failed to deploy contract');
     }
   };
 
-  const isDeploying = isPending || isConfirming;
+  const isDeploying = isPending || isConfirming || isValidatingBasename;
 
   return (
     <WalletGate
@@ -209,7 +299,7 @@ export default function CreatePage() {
                 <div className="border-t-[3px] border-black p-4 bg-paper-cream shrink-0">
                   <TerminalInput
                     value={input}
-                    onChange={handleInputChange}
+                    onChange={handleTerminalInputChange}
                     onSubmit={onSubmit}
                     placeholder="Describe what you want to create..."
                     disabled={isLoading}
@@ -279,7 +369,7 @@ export default function CreatePage() {
                 <div className="border-t-[3px] border-black p-4 bg-paper-cream shrink-0">
                   <TerminalInput
                     value={input}
-                    onChange={handleInputChange}
+                    onChange={handleTerminalInputChange}
                     onSubmit={onSubmit}
                     placeholder="Describe your agreement..."
                     disabled={isLoading}
@@ -306,6 +396,7 @@ export default function CreatePage() {
                   template={activeTemplate}
                   config={extractedConfig}
                   onDeploy={handleDeploy}
+                  onBasenameChange={setCustomBasename}
                   isDeploying={isDeploying}
                   isSuccess={isSuccess}
                   deployedAddress={deployedAddress ?? undefined}
@@ -368,7 +459,9 @@ export default function CreatePage() {
                 {isDeploying && !isSuccess && (
                   <div className="mt-4">
                     <StatusBanner variant="info">
-                      Deploying contract... Please wait for confirmation.
+                      {isValidatingBasename
+                        ? 'Validating name availability...'
+                        : 'Deploying contract... Please wait for confirmation.'}
                     </StatusBanner>
                   </div>
                 )}
