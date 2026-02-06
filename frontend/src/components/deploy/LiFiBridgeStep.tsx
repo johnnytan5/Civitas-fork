@@ -17,6 +17,7 @@ interface LiFiBridgeStepProps {
     chainId: number;
     tokenAddress: string;
     tokenSymbol: string;
+    tool?: string;
   };
 }
 

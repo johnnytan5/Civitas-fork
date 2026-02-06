@@ -15,6 +15,7 @@ interface RouteComparisonCardProps {
   routes: Route[];
   recommendedIndex: number;
   requiredAmount: string; // e.g., "1200"
+  onSelectRoute?: (route: Route) => void;
 }
 
 const CHAIN_NAMES: Record<number, string> = {
@@ -31,6 +32,7 @@ export function RouteComparisonCard({
   routes,
   recommendedIndex,
   requiredAmount,
+  onSelectRoute,
 }: RouteComparisonCardProps) {
   if (!routes || routes.length === 0) return null;
 
@@ -58,11 +60,13 @@ export function RouteComparisonCard({
             return (
               <div
                 key={`${route.sourceChainId}-${route.sourceToken}`}
+                onClick={() => onSelectRoute && onSelectRoute(route)}
                 className={`
                   relative border-2 p-3 transition-all
+                  ${onSelectRoute ? 'cursor-pointer hover:border-black' : ''}
                   ${isRecommended
                     ? 'border-black bg-[#f0fdf4] shadow-[2px_2px_0px_#000000] z-10'
-                    : 'border-gray-200 bg-gray-50 text-gray-500'
+                    : `border-gray-200 bg-gray-50 text-gray-500 ${onSelectRoute ? 'hover:bg-white' : ''}`
                   }
                 `}
               >

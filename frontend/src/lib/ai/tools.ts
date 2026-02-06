@@ -1,71 +1,15 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 import { createPublicClient, http, isAddress as viemIsAddress, formatUnits, parseUnits } from 'viem';
-import { base, baseSepolia, mainnet, arbitrum, optimism, polygon } from 'viem/chains';
+import { base, baseSepolia } from 'viem/chains';
 import { USDC_ADDRESS, USDC_DECIMALS } from '@/lib/contracts/constants';
 import { isENSName, isAddress, formatAddress } from '@/lib/ens/resolver';
-
-// Minimal ERC20 ABI for checking balances
-const ERC20_ABI = [
-  {
-    name: 'balanceOf',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [{ name: 'account', type: 'address' }],
-    outputs: [{ name: '', type: 'uint256' }],
-  },
-  {
-    name: 'decimals',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [],
-    outputs: [{ name: '', type: 'uint8' }],
-  },
-] as const;
-
-// Token configuration for balance scanning
-const CHAIN_TOKENS = [
-  {
-    chain: mainnet,
-    name: 'Ethereum Mainnet',
-    tokens: [
-      { symbol: 'ETH', address: '0x0000000000000000000000000000000000000000', decimals: 18 },
-      { symbol: 'USDC', address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', decimals: 6 }
-    ]
-  },
-  {
-    chain: base,
-    name: 'Base',
-    tokens: [
-      { symbol: 'ETH', address: '0x0000000000000000000000000000000000000000', decimals: 18 },
-      { symbol: 'USDC', address: USDC_ADDRESS[base.id], decimals: 6 }
-    ]
-  },
-  {
-    chain: arbitrum,
-    name: 'Arbitrum',
-    tokens: [
-      { symbol: 'ETH', address: '0x0000000000000000000000000000000000000000', decimals: 18 },
-      { symbol: 'USDC', address: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831', decimals: 6 }
-    ]
-  },
-  {
-    chain: optimism,
-    name: 'Optimism',
-    tokens: [
-      { symbol: 'ETH', address: '0x0000000000000000000000000000000000000000', decimals: 18 },
-      { symbol: 'USDC', address: '0x0b2C639c53A9AD698533B4384aC2604035C125dB', decimals: 6 }
-    ]
-  },
-  {
-    chain: polygon,
-    name: 'Polygon',
-    tokens: [
-      { symbol: 'MATIC', address: '0x0000000000000000000000000000000000000000', decimals: 18 },
-      { symbol: 'USDC', address: '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359', decimals: 6 }
-    ]
-  },
-];
+import {
+  scanWalletBalances as scanWalletBalancesLogic,
+  getOptimalFundingRoutes as getOptimalFundingRoutesLogic,
+  CHAIN_TOKENS,
+  ERC20_ABI
+} from '@/lib/funding/routing';
 
 /**
  * Resolve ENS names to Ethereum addresses
@@ -355,8 +299,8 @@ const scanWalletBalances = tool({
 
                 // Filter out dust (< 0.0001)
                 if (parseFloat(formatted) < 0.0001) {
-                    console.log(`[scanWalletBalances] Ignoring dust balance for ${token.symbol} on ${chainConfig.name}`);
-                    return null;
+                  console.log(`[scanWalletBalances] Ignoring dust balance for ${token.symbol} on ${chainConfig.name}`);
+                  return null;
                 }
 
                 return {
@@ -449,35 +393,35 @@ const getOptimalFundingRoute = tool({
             // If token is ETH/MATIC, we need price.
             // Let's assume 1 ETH for the quote if symbol is ETH/MATIC, and `amount` if stable.
 
-             let amountForQuote = parseUnits(amount, decimals).toString();
-             if (candidate.symbol === 'ETH' || candidate.symbol === 'MATIC') {
-                 // Use a dummy amount that is likely sufficient for a quote, e.g. 0.1 ETH
-                 amountForQuote = parseUnits('0.1', decimals).toString();
-             }
+            let amountForQuote = parseUnits(amount, decimals).toString();
+            if (candidate.symbol === 'ETH' || candidate.symbol === 'MATIC') {
+              // Use a dummy amount that is likely sufficient for a quote, e.g. 0.1 ETH
+              amountForQuote = parseUnits('0.1', decimals).toString();
+            }
 
-             const response = await fetch(`https://li.quest/v1/quote?${new URLSearchParams({
-               fromChain: candidate.chainId.toString(),
-               toChain: base.id.toString(),
-               fromToken: candidate.tokenAddress,
-               toToken: USDC_ADDRESS[base.id],
-               fromAmount: amountForQuote,
-               fromAddress: walletAddress,
-               toAddress: destinationAddress,
-             })}`);
+            const response = await fetch(`https://li.quest/v1/quote?${new URLSearchParams({
+              fromChain: candidate.chainId.toString(),
+              toChain: base.id.toString(),
+              fromToken: candidate.tokenAddress,
+              toToken: USDC_ADDRESS[base.id],
+              fromAmount: amountForQuote,
+              fromAddress: walletAddress,
+              toAddress: destinationAddress,
+            })}`);
 
-             if (!response.ok) return null;
-             const data = await response.json();
+            if (!response.ok) return null;
+            const data = await response.json();
 
-             return {
-               sourceChainId: candidate.chainId,
-               sourceToken: candidate.symbol,
-               sourceTokenAddress: candidate.tokenAddress,
-               gasCostUsd: data.estimate.gasCosts?.[0]?.amountUSD || '0',
-               executionDuration: data.estimate.executionDuration,
-               tool: data.tool,
-               steps: data.includedSteps?.length || 1,
-               action: data.action
-             };
+            return {
+              sourceChainId: candidate.chainId,
+              sourceToken: candidate.symbol,
+              sourceTokenAddress: candidate.tokenAddress,
+              gasCostUsd: data.estimate.gasCosts?.[0]?.amountUSD || '0',
+              executionDuration: data.estimate.executionDuration,
+              tool: data.tool,
+              steps: data.includedSteps?.length || 1,
+              action: data.action
+            };
 
           } catch (e) {
             return null;

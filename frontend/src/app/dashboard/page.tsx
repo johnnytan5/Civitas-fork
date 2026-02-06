@@ -9,7 +9,8 @@ import CommandZone from '@/components/dashboard/CommandZone';
 import ExecutionZoneRouter from '@/components/dashboard/ExecutionZoneRouter';
 import NetworkSwitcher from '@/components/wallet/NetworkSwitcher';
 
-import type { ContractTemplate } from '@/lib/contracts/constants';
+import { useNetworkMode } from '@/contexts/NetworkModeContext';
+import { type ContractTemplate, getTargetChainId } from '@/lib/contracts/constants';
 
 // Contract type from database
 interface GenericContract {
@@ -75,7 +76,7 @@ export default function DashboardPage() {
           const data = await response.json();
           const fetchedContracts = data.contracts || [];
           setContracts(fetchedContracts);
-          
+
           // Auto-select first contract
           if (fetchedContracts.length > 0) {
             setSelectedContract(fetchedContracts[0]);
@@ -91,8 +92,13 @@ export default function DashboardPage() {
     loadContracts();
   }, [address]);
 
+  const { networkMode } = useNetworkMode();
+  const targetChainId = getTargetChainId(networkMode);
+
   // Filter contracts based on selected filters
-  let filteredContracts = [...contracts];
+  let filteredContracts = contracts.filter((contract) => {
+    return contract.chain_id === targetChainId;
+  });
 
   if (templateFilter !== 'all') {
     filteredContracts = filteredContracts.filter((contract) => {
@@ -105,6 +111,31 @@ export default function DashboardPage() {
       return contract.state === stateFilter;
     });
   }
+
+  // Effect to sync selectedContract with filteredContracts
+  // This ensures that when switching networks (or filters), we don't show a stale contract
+  useEffect(() => {
+    // If we have a selected contract, check if it's still in the filtered list
+    if (selectedContract) {
+      const exists = filteredContracts.find(c => c.id === selectedContract.id);
+      if (!exists) {
+        // If not found, select the first one from the new list, or null if empty
+        setSelectedContract(filteredContracts.length > 0 ? filteredContracts[0] : null);
+      }
+    } else {
+      // If nothing selected but we have contracts, select the first one
+      if (filteredContracts.length > 0) {
+        setSelectedContract(filteredContracts[0]);
+      }
+    }
+  }, [networkMode, templateFilter, stateFilter, contracts]); // Depend on filters/data, not filteredContracts directly to avoid loops if needed, though filteredContracts is derived.
+  // Actually, depending on filteredContracts.map(c => c.id).join(',') is safer to detect list changes,
+  // or just depend on the filter inputs.
+  // Ideally we just want to run this when the LIST changes content.
+  // Let's use the filter inputs + contracts length as a proxy for "list might have changed"
+  // Or better, just run it. Using JSON.stringify on IDs is a common trick but maybe heavy.
+  // Let's rely on the inputs that generate filteredContracts:
+  // [networkMode, templateFilter, stateFilter, contracts]
 
   return (
     <WalletGate
@@ -168,10 +199,9 @@ export default function DashboardPage() {
                   shadow-[2px_2px_0px_#000]
                   font-display font-bold text-sm uppercase
                   transition-all
-                  ${
-                    syncing
-                      ? 'bg-gray-300 text-gray-600 cursor-wait'
-                      : 'bg-acid-lime text-void-black hover:shadow-[4px_4px_0px_#000] hover:translate-x-[-2px] hover:translate-y-[-2px] cursor-pointer'
+                  ${syncing
+                    ? 'bg-gray-300 text-gray-600 cursor-wait'
+                    : 'bg-acid-lime text-void-black hover:shadow-[4px_4px_0px_#000] hover:translate-x-[-2px] hover:translate-y-[-2px] cursor-pointer'
                   }
                 `}
               >

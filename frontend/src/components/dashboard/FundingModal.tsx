@@ -1,9 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { X, Sparkles, Loader2 } from 'lucide-react';
+import { useAccount } from 'wagmi';
+import { formatUnits } from 'viem';
 import FundingMethodSelector, { type FundingMethod } from './FundingMethodSelector';
 import { LiFiBridgeStep, DirectFundingStep, BalancePoller } from '@/components/deploy';
+import { RouteComparisonCard } from '@/components/deploy/RouteComparisonCard';
 import { isLiFiSupported } from '@/lib/lifi';
 import { StatusBanner } from '@/components/ui/StatusBanner';
 
@@ -26,11 +29,17 @@ export default function FundingModal({
   onFundingComplete,
   contractType = 'contract',
 }: FundingModalProps) {
+  const { address: walletAddress } = useAccount();
   const [selectedMethod, setSelectedMethod] = useState<FundingMethod | null>(null);
   const [fundingStep, setFundingStep] = useState<'idle' | 'funding' | 'polling' | 'complete'>('idle');
   const [fundingError, setFundingError] = useState<string | null>(null);
   const [customAmount, setCustomAmount] = useState<string>('');
   const [recommendedSource, setRecommendedSource] = useState<any>(null);
+
+  // AI Analysis State
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisRoutes, setAnalysisRoutes] = useState<any[]>([]);
+  const [recommendedIndex, setRecommendedIndex] = useState(0);
 
   const isMainnet = isLiFiSupported(chainId);
 
@@ -70,6 +79,7 @@ export default function FundingModal({
     setSelectedMethod(null);
     setFundingStep('idle');
     setFundingError(null);
+    setAnalysisRoutes([]); // Clear analysis when going back
   };
 
   const handleFundingCompleted = () => {
@@ -93,13 +103,84 @@ export default function FundingModal({
     setFundingStep('idle');
     setFundingError(null);
     setCustomAmount('');
+    setAnalysisRoutes([]);
+    setIsAnalyzing(false);
     onClose();
+  };
+
+  // AI Analysis Handler
+  const handleAnalyze = async () => {
+    const currentAmount = getAmount();
+    if (currentAmount <= 0) {
+      setFundingError('Please enter a valid amount first');
+      return;
+    }
+
+    if (!walletAddress) {
+      setFundingError('Please connect your wallet first');
+      return;
+    }
+
+    const amountStr = formatUnits(currentAmount, 6); // USDC has 6 decimals
+
+    setIsAnalyzing(true);
+    setFundingError(null);
+    setAnalysisRoutes([]);
+
+    try {
+      const response = await fetch('/api/funding/routes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          walletAddress,
+          destinationAddress: contractAddress,
+          amount: amountStr
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to analyze routes');
+      }
+
+      setAnalysisRoutes(data.routes);
+      // find index of best route
+      if (data.recommendation && data.recommendation.bestRoute) {
+        const bestIndex = data.routes.findIndex((r: any) =>
+          r.sourceChainId === data.recommendation.bestRoute.sourceChainId &&
+          r.sourceToken === data.recommendation.bestRoute.sourceToken
+        );
+        setRecommendedIndex(bestIndex >= 0 ? bestIndex : 0);
+      }
+
+    } catch (error: any) {
+      console.error('Analysis error:', error);
+      setFundingError(error.message || 'Failed to analyze routes. Please try again.');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleRouteSelect = (route: any) => {
+    setRecommendedSource({
+      chainId: route.sourceChainId,
+      tokenAddress: route.sourceTokenAddress,
+      tokenSymbol: route.sourceToken,
+      tool: route.tool
+    });
+    setSelectedMethod('lifi');
+    // We keep analysisRoutes visible? No, usually we want to proceed to the bridge step.
+    // The bridge step will use the recommendedSource.
+    // We can clear analysisRoutes to "move forward" visually
+    setAnalysisRoutes([]);
   };
 
   if (!isOpen) return null;
 
   const amount = getAmount();
   const isAmountValid = amount > 0;
+  const amountDisplay = formatUnits(amount, 6);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
@@ -160,9 +241,71 @@ export default function FundingModal({
             </div>
           )}
 
-          {/* Step 1: Method Selection */}
+          {/* Step 1: Method Selection & AI Analysis */}
           {!selectedMethod && fundingStep === 'idle' && (
-            <FundingMethodSelector onSelect={handleMethodSelect} showLiFi={isMainnet} />
+            <div className="space-y-6">
+              {/* AI Analysis Button - Only show if valid amount and no results yet */}
+              {isAmountValid && isMainnet && analysisRoutes.length === 0 && (
+                <div className="bg-[#F0FDF4] border-2 border-green-800 p-4 rounded-lg relative overflow-hidden">
+                   <div className="absolute top-0 right-0 p-2 opacity-10">
+                     <Sparkles className="w-16 h-16 text-green-600" />
+                   </div>
+
+                   <div className="relative z-10">
+                     <h3 className="font-bold text-green-900 mb-1 flex items-center gap-2">
+                       <Sparkles className="w-4 h-4" />
+                       AI Funding Advisor
+                     </h3>
+                     <p className="text-sm text-green-800 mb-3">
+                       Let AI scan your wallet across all chains to find the cheapest way to fund this contract.
+                     </p>
+
+                     <button
+                       onClick={handleAnalyze}
+                       disabled={isAnalyzing}
+                       className="w-full bg-white border-2 border-green-800 text-green-900 font-bold py-2 px-4 shadow-[2px_2px_0px_#166534] hover:shadow-[1px_1px_0px_#166534] hover:translate-x-[1px] hover:translate-y-[1px] transition-all flex items-center justify-center gap-2"
+                     >
+                       {isAnalyzing ? (
+                         <>
+                           <Loader2 className="w-4 h-4 animate-spin" />
+                           Scanning Wallets...
+                         </>
+                       ) : (
+                         <>
+                           Analyze Best Route
+                         </>
+                       )}
+                     </button>
+                   </div>
+                </div>
+              )}
+
+              {/* Analysis Results */}
+              {analysisRoutes.length > 0 && (
+                 <div className="mb-6 animate-in fade-in zoom-in duration-300">
+                    <div className="flex justify-between items-center mb-2">
+                       <h3 className="font-bold text-sm uppercase">AI Recommendations</h3>
+                       <button
+                         onClick={() => setAnalysisRoutes([])}
+                         className="text-xs text-gray-500 hover:text-black underline"
+                       >
+                         Clear
+                       </button>
+                    </div>
+                    <RouteComparisonCard
+                      routes={analysisRoutes}
+                      recommendedIndex={recommendedIndex}
+                      requiredAmount={amountDisplay}
+                      onSelectRoute={handleRouteSelect}
+                    />
+                    <p className="text-xs text-center text-gray-500 mt-2">
+                      Click on a route above to proceed
+                    </p>
+                 </div>
+              )}
+
+              <FundingMethodSelector onSelect={handleMethodSelect} showLiFi={isMainnet} />
+            </div>
           )}
 
           {/* Step 2: Direct Transfer */}
@@ -208,6 +351,7 @@ export default function FundingModal({
                   onBridgeStarted={(hash) => console.log('Bridge tx:', hash)}
                   onBridgeCompleted={handleFundingCompleted}
                   onError={handleError}
+                  recommendedSource={recommendedSource}
                 />
               ) : (
                 <StatusBanner variant="warning">
