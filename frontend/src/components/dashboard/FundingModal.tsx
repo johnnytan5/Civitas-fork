@@ -1,14 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { X, Sparkles, Loader2 } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { X } from 'lucide-react';
 import { useAccount } from 'wagmi';
 import { formatUnits } from 'viem';
-import FundingMethodSelector, { type FundingMethod } from './FundingMethodSelector';
 import { LiFiBridgeStep, DirectFundingStep, BalancePoller } from '@/components/deploy';
-import { RouteComparisonCard } from '@/components/deploy/RouteComparisonCard';
+import ScanningAnimation, { type ScanProgress } from './ScanningAnimation';
+import RecommendedRouteCard from './RecommendedRouteCard';
+import AlternativesSection from './AlternativesSection';
 import { isLiFiSupported } from '@/lib/lifi';
 import { StatusBanner } from '@/components/ui/StatusBanner';
+import { useDebounce } from '@/hooks/useDebounce';
 
 interface FundingModalProps {
   isOpen: boolean;
@@ -20,6 +22,14 @@ interface FundingModalProps {
   contractType?: string; // For display purposes
 }
 
+type FundingFlowState =
+  | 'idle'           // Waiting for valid amount input
+  | 'scanning'       // AI analyzing wallet + routes
+  | 'results'        // Display best route + alternatives
+  | 'executing'      // LiFiBridgeStep executing
+  | 'polling'        // Waiting for balance confirmation
+  | 'complete';      // Success
+
 export default function FundingModal({
   isOpen,
   onClose,
@@ -30,102 +40,50 @@ export default function FundingModal({
   contractType = 'contract',
 }: FundingModalProps) {
   const { address: walletAddress } = useAccount();
-  const [selectedMethod, setSelectedMethod] = useState<FundingMethod | null>(null);
-  const [fundingStep, setFundingStep] = useState<'idle' | 'funding' | 'polling' | 'complete'>('idle');
+  const [flowState, setFlowState] = useState<FundingFlowState>('idle');
   const [fundingError, setFundingError] = useState<string | null>(null);
   const [customAmount, setCustomAmount] = useState<string>('');
-  const [recommendedSource, setRecommendedSource] = useState<any>(null);
+  const debouncedAmount = useDebounce(customAmount, 800); // 800ms debounce
 
-  // AI Analysis State
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  // AI Flow State
+  const [scanProgress, setScanProgress] = useState<ScanProgress | null>(null);
   const [analysisRoutes, setAnalysisRoutes] = useState<any[]>([]);
-  const [recommendedIndex, setRecommendedIndex] = useState(0);
+  const [selectedRouteIndex, setSelectedRouteIndex] = useState(0);
+  const [showAlternatives, setShowAlternatives] = useState(false);
 
   const isMainnet = isLiFiSupported(chainId);
 
-  // Load AI recommendation from local storage
-  useEffect(() => {
-    if (isOpen) {
-      const stored = localStorage.getItem('civitas_ai_recommendation');
-      if (stored) {
-        try {
-          setRecommendedSource(JSON.parse(stored));
-        } catch (e) {
-          console.error('Failed to parse AI recommendation', e);
-        }
-      }
-    }
-  }, [isOpen]);
-
   // Calculate amount to use
-  const getAmount = (): bigint => {
+  const getAmount = useCallback((val?: string): bigint => {
     if (requiredAmount) return requiredAmount;
-    if (customAmount) {
+    const valueToParse = val !== undefined ? val : customAmount;
+    if (valueToParse) {
       try {
-        return BigInt(Math.floor(parseFloat(customAmount) * 1e6));
+        return BigInt(Math.floor(parseFloat(valueToParse) * 1e6));
       } catch {
         return BigInt(0);
       }
     }
     return BigInt(0);
-  };
+  }, [requiredAmount, customAmount]);
 
-  const handleMethodSelect = (method: FundingMethod) => {
-    setSelectedMethod(method);
-    setFundingError(null);
-  };
+  const handleScan = useCallback(async () => {
+    const currentAmount = requiredAmount || getAmount(debouncedAmount);
 
-  const handleBack = () => {
-    setSelectedMethod(null);
-    setFundingStep('idle');
-    setFundingError(null);
-    setAnalysisRoutes([]); // Clear analysis when going back
-  };
-
-  const handleFundingCompleted = () => {
-    setFundingStep('polling');
-  };
-
-  const handleBalanceConfirmed = () => {
-    setFundingStep('complete');
-    if (onFundingComplete) {
-      onFundingComplete();
-    }
-  };
-
-  const handleError = (error: Error) => {
-    setFundingError(error.message);
-  };
-
-  const handleClose = () => {
-    // Reset state when closing
-    setSelectedMethod(null);
-    setFundingStep('idle');
-    setFundingError(null);
-    setCustomAmount('');
-    setAnalysisRoutes([]);
-    setIsAnalyzing(false);
-    onClose();
-  };
-
-  // AI Analysis Handler
-  const handleAnalyze = async () => {
-    const currentAmount = getAmount();
-    if (currentAmount <= 0) {
-      setFundingError('Please enter a valid amount first');
+    // Basic validation
+    if (currentAmount <= 0 || !walletAddress) {
       return;
     }
 
-    if (!walletAddress) {
-      setFundingError('Please connect your wallet first');
-      return;
-    }
+    const amountStr = formatUnits(currentAmount, 6);
 
-    const amountStr = formatUnits(currentAmount, 6); // USDC has 6 decimals
-
-    setIsAnalyzing(true);
+    setFlowState('scanning');
     setFundingError(null);
     setAnalysisRoutes([]);
+    setScanProgress({
+      step: 'wallet',
+      message: 'Starting scan...',
+    });
 
     try {
       const response = await fetch('/api/funding/routes', {
@@ -145,35 +103,104 @@ export default function FundingModal({
       }
 
       setAnalysisRoutes(data.routes);
-      // find index of best route
+
+      // Find index of best route
       if (data.recommendation && data.recommendation.bestRoute) {
         const bestIndex = data.routes.findIndex((r: any) =>
           r.sourceChainId === data.recommendation.bestRoute.sourceChainId &&
           r.sourceToken === data.recommendation.bestRoute.sourceToken
         );
-        setRecommendedIndex(bestIndex >= 0 ? bestIndex : 0);
+        setSelectedRouteIndex(bestIndex >= 0 ? bestIndex : 0);
+      }
+
+      // If no routes found, show error
+      if (!data.routes || data.routes.length === 0) {
+        setFundingError('No optimal routes found. Your wallet may not have sufficient funds on supported chains.');
+        setFlowState('idle');
+      } else {
+        setFlowState('results');
       }
 
     } catch (error: any) {
-      console.error('Analysis error:', error);
-      setFundingError(error.message || 'Failed to analyze routes. Please try again.');
-    } finally {
-      setIsAnalyzing(false);
+      console.error('Scan error:', error);
+      setFundingError(error.message || 'Failed to scan wallet. Please try again.');
+      setFlowState('idle');
+    }
+  }, [debouncedAmount, requiredAmount, walletAddress, contractAddress, getAmount]);
+
+  // Auto-trigger scan when amount becomes valid on mainnet
+  useEffect(() => {
+    if (!isMainnet || !walletAddress) return;
+
+    const amount = getAmount(debouncedAmount);
+    if (amount <= 0) {
+      setFlowState('idle');
+      return;
+    }
+
+    // Auto-trigger scan when amount becomes valid
+    if (flowState === 'idle') {
+      handleScan();
+    }
+  }, [debouncedAmount, isMainnet, walletAddress, flowState, getAmount, handleScan]);
+
+  const handleUseRoute = () => {
+    // Check if this is a direct transfer (USDC on Base)
+    if (selectedRoute?.isDirect) {
+      setFlowState('executing');
+    } else {
+      // For bridge routes, go straight to execution
+      setFlowState('executing');
     }
   };
 
+  const handleSeeAlternatives = () => {
+    setShowAlternatives(true);
+  };
+
+  const handleCollapseAlternatives = () => {
+    setShowAlternatives(false);
+  };
+
   const handleRouteSelect = (route: any) => {
-    setRecommendedSource({
-      chainId: route.sourceChainId,
-      tokenAddress: route.sourceTokenAddress,
-      tokenSymbol: route.sourceToken,
-      tool: route.tool
-    });
-    setSelectedMethod('lifi');
-    // We keep analysisRoutes visible? No, usually we want to proceed to the bridge step.
-    // The bridge step will use the recommendedSource.
-    // We can clear analysisRoutes to "move forward" visually
+    const index = analysisRoutes.findIndex(
+      r => r.sourceChainId === route.sourceChainId && r.sourceToken === route.sourceToken
+    );
+    if (index >= 0) {
+      setSelectedRouteIndex(index);
+    }
+    setShowAlternatives(false);
+  };
+
+  const handleFundingCompleted = () => {
+    setFlowState('polling');
+  };
+
+  const handleBalanceConfirmed = () => {
+    setFlowState('complete');
+    if (onFundingComplete) {
+      onFundingComplete();
+    }
+  };
+
+  const handleError = (error: Error) => {
+    setFundingError(error.message);
+    setFlowState('results'); // Go back to results so user can try different route
+  };
+
+  const handleClose = () => {
+    // Reset state when closing
+    setFlowState('idle');
+    setFundingError(null);
+    setCustomAmount('');
     setAnalysisRoutes([]);
+    setShowAlternatives(false);
+    setScanProgress(null);
+    onClose();
+  };
+
+  const handleSkipToManual = () => {
+    setFlowState('executing');
   };
 
   if (!isOpen) return null;
@@ -181,6 +208,7 @@ export default function FundingModal({
   const amount = getAmount();
   const isAmountValid = amount > 0;
   const amountDisplay = formatUnits(amount, 6);
+  const selectedRoute = analysisRoutes[selectedRouteIndex];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
@@ -226,6 +254,7 @@ export default function FundingModal({
                     onChange={(e) => setCustomAmount(e.target.value)}
                     placeholder="Enter amount..."
                     className="w-full border-[2px] border-black px-3 py-2 font-mono text-lg"
+                    disabled={flowState !== 'idle'}
                   />
                 </div>
               )}
@@ -241,84 +270,61 @@ export default function FundingModal({
             </div>
           )}
 
-          {/* Step 1: Method Selection & AI Analysis */}
-          {!selectedMethod && fundingStep === 'idle' && (
-            <div className="space-y-6">
-              {/* AI Analysis Button - Only show if valid amount and no results yet */}
-              {isAmountValid && isMainnet && analysisRoutes.length === 0 && (
-                <div className="bg-[#F0FDF4] border-2 border-green-800 p-4 rounded-lg relative overflow-hidden">
-                   <div className="absolute top-0 right-0 p-2 opacity-10">
-                     <Sparkles className="w-16 h-16 text-green-600" />
-                   </div>
-
-                   <div className="relative z-10">
-                     <h3 className="font-bold text-green-900 mb-1 flex items-center gap-2">
-                       <Sparkles className="w-4 h-4" />
-                       AI Funding Advisor
-                     </h3>
-                     <p className="text-sm text-green-800 mb-3">
-                       Let AI scan your wallet across all chains to find the cheapest way to fund this contract.
-                     </p>
-
-                     <button
-                       onClick={handleAnalyze}
-                       disabled={isAnalyzing}
-                       className="w-full bg-white border-2 border-green-800 text-green-900 font-bold py-2 px-4 shadow-[2px_2px_0px_#166534] hover:shadow-[1px_1px_0px_#166534] hover:translate-x-[1px] hover:translate-y-[1px] transition-all flex items-center justify-center gap-2"
-                     >
-                       {isAnalyzing ? (
-                         <>
-                           <Loader2 className="w-4 h-4 animate-spin" />
-                           Scanning Wallets...
-                         </>
-                       ) : (
-                         <>
-                           Analyze Best Route
-                         </>
-                       )}
-                     </button>
-                   </div>
-                </div>
+          {/* Flow States */}
+          {/* State: Idle */}
+          {flowState === 'idle' && (
+            <>
+              {!isMainnet && isAmountValid && (
+                <DirectFundingStep
+                  destinationAddress={contractAddress}
+                  amount={amount}
+                  chainId={chainId}
+                  onTransferCompleted={handleFundingCompleted}
+                  onError={handleError}
+                />
               )}
-
-              {/* Analysis Results */}
-              {analysisRoutes.length > 0 && (
-                 <div className="mb-6 animate-in fade-in zoom-in duration-300">
-                    <div className="flex justify-between items-center mb-2">
-                       <h3 className="font-bold text-sm uppercase">AI Recommendations</h3>
-                       <button
-                         onClick={() => setAnalysisRoutes([])}
-                         className="text-xs text-gray-500 hover:text-black underline"
-                       >
-                         Clear
-                       </button>
-                    </div>
-                    <RouteComparisonCard
-                      routes={analysisRoutes}
-                      recommendedIndex={recommendedIndex}
-                      requiredAmount={amountDisplay}
-                      onSelectRoute={handleRouteSelect}
-                    />
-                    <p className="text-xs text-center text-gray-500 mt-2">
-                      Click on a route above to proceed
-                    </p>
-                 </div>
+              {isMainnet && !isAmountValid && (
+                <StatusBanner variant="info">
+                  Enter an amount to see AI-powered funding recommendations
+                </StatusBanner>
               )}
-
-              <FundingMethodSelector onSelect={handleMethodSelect} showLiFi={isMainnet} />
-            </div>
+            </>
           )}
 
-          {/* Step 2: Direct Transfer */}
-          {selectedMethod === 'direct' && fundingStep === 'idle' && (
-            <div className="space-y-4">
-              <button
-                onClick={handleBack}
-                className="text-sm underline hover:no-underline mb-4"
-              >
-                ← Back to method selection
-              </button>
+          {/* State: Scanning */}
+          {flowState === 'scanning' && scanProgress && (
+            <ScanningAnimation
+              progress={scanProgress}
+              onSkip={handleSkipToManual}
+            />
+          )}
 
-              {isAmountValid ? (
+          {/* State: Results */}
+          {flowState === 'results' && selectedRoute && (
+            <>
+              {!showAlternatives ? (
+                <RecommendedRouteCard
+                  route={selectedRoute}
+                  amount={amountDisplay}
+                  onExecute={handleUseRoute}
+                  onSeeAlternatives={handleSeeAlternatives}
+                />
+              ) : (
+                <AlternativesSection
+                  routes={analysisRoutes}
+                  recommendedIndex={selectedRouteIndex}
+                  requiredAmount={amountDisplay}
+                  onSelectRoute={handleRouteSelect}
+                  onCollapse={handleCollapseAlternatives}
+                />
+              )}
+            </>
+          )}
+
+          {/* State: Executing */}
+          {flowState === 'executing' && isAmountValid && (
+            <>
+              {selectedRoute?.isDirect ? (
                 <DirectFundingStep
                   destinationAddress={contractAddress}
                   amount={amount}
@@ -327,48 +333,32 @@ export default function FundingModal({
                   onError={handleError}
                 />
               ) : (
-                <StatusBanner variant="warning">
-                  Please enter a valid amount to continue
-                </StatusBanner>
-              )}
-            </div>
-          )}
-
-          {/* Step 2: LI.FI Bridge */}
-          {selectedMethod === 'lifi' && fundingStep === 'idle' && (
-            <div className="space-y-4">
-              <button
-                onClick={handleBack}
-                className="text-sm underline hover:no-underline mb-4"
-              >
-                ← Back to method selection
-              </button>
-
-              {isAmountValid ? (
                 <LiFiBridgeStep
                   destinationAddress={contractAddress}
                   amount={amount}
                   onBridgeStarted={(hash) => console.log('Bridge tx:', hash)}
                   onBridgeCompleted={handleFundingCompleted}
                   onError={handleError}
-                  recommendedSource={recommendedSource}
+                  preselectedRoute={selectedRoute ? {
+                    sourceChainId: selectedRoute.sourceChainId,
+                    sourceTokenAddress: selectedRoute.sourceTokenAddress,
+                    sourceToken: selectedRoute.sourceToken,
+                    tool: selectedRoute.tool,
+                    isDirect: selectedRoute.isDirect,
+                    action: selectedRoute.action,
+                  } : undefined}
+                  autoExecute={!!selectedRoute?.action}
                 />
-              ) : (
-                <StatusBanner variant="warning">
-                  Please enter a valid amount to continue
-                </StatusBanner>
               )}
-            </div>
+            </>
           )}
 
-          {/* Step 3: Polling for Balance */}
-          {fundingStep === 'polling' && (
+          {/* State: Polling */}
+          {flowState === 'polling' && (
             <div className="space-y-4">
               <h3 className="font-headline text-xl uppercase">Waiting for Funds</h3>
               <p className="font-display text-sm text-gray-600">
-                {selectedMethod === 'lifi'
-                  ? 'Bridge transaction submitted! Waiting for funds to arrive...'
-                  : 'Transfer submitted! Waiting for confirmation...'}
+                Bridge transaction submitted! Waiting for funds to arrive...
               </p>
               <BalancePoller
                 contractAddress={contractAddress}
@@ -376,16 +366,14 @@ export default function FundingModal({
                 chainId={chainId}
                 onFunded={handleBalanceConfirmed}
               />
-              {selectedMethod === 'lifi' && (
-                <p className="text-xs text-gray-500 text-center mt-4">
-                  Cross-chain transfers typically take 1-5 minutes
-                </p>
-              )}
+              <p className="text-xs text-gray-500 text-center mt-4">
+                Cross-chain transfers typically take 1-5 minutes
+              </p>
             </div>
           )}
 
-          {/* Step 4: Complete */}
-          {fundingStep === 'complete' && (
+          {/* State: Complete */}
+          {flowState === 'complete' && (
             <div className="bg-acid-lime border-[3px] border-black p-8 text-center">
               <div className="text-6xl mb-4">✓</div>
               <h3 className="font-headline text-2xl uppercase mb-2">Funding Complete!</h3>

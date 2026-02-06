@@ -40,7 +40,7 @@ export function RouteComparisonCard({
     <div className="w-full bg-white border-[3px] border-black shadow-[4px_4px_0px_#000000]">
       {/* Header */}
       <div className="bg-black text-white p-3 flex justify-between items-center">
-        <div className="font-bold text-sm uppercase tracking-wider">Cross-Chain Funding Routes</div>
+        <div className="font-bold text-sm uppercase tracking-wider text-white" style={{ color: '#ffffff' }}>Cross-Chain Funding Routes</div>
         <div className="text-xs bg-[#CCFF00] text-black px-2 py-0.5 font-bold rounded-sm">
           AI ANALYZED
         </div>

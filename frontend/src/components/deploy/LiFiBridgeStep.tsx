@@ -19,6 +19,15 @@ interface LiFiBridgeStepProps {
     tokenSymbol: string;
     tool?: string;
   };
+  preselectedRoute?: {
+    sourceChainId: number;
+    sourceTokenAddress: string;
+    sourceToken: string;
+    tool: string;
+    isDirect?: boolean;
+    action?: any; // LI.FI route action for direct execution
+  };
+  autoExecute?: boolean; // Skip UI and execute immediately
 }
 
 type BridgeState = 'idle' | 'loading-routes' | 'selecting' | 'executing' | 'completed' | 'error';
@@ -46,6 +55,8 @@ export function LiFiBridgeStep({
   onBridgeCompleted,
   onError,
   recommendedSource,
+  preselectedRoute,
+  autoExecute = false,
 }: LiFiBridgeStepProps) {
   const { address } = useAccount();
   const wagmiConfig = useConfig();
@@ -58,15 +69,15 @@ export function LiFiBridgeStep({
 
   // Source chain selection
   const [fromChainId, setFromChainId] = useState<number>(
-    recommendedSource?.chainId || LIFI_SUPPORTED_CHAIN_IDS.ETHEREUM_MAINNET
+    preselectedRoute?.sourceChainId || recommendedSource?.chainId || LIFI_SUPPORTED_CHAIN_IDS.ETHEREUM_MAINNET
   );
 
   // Token selection state
   const [fromTokenAddress, setFromTokenAddress] = useState<string>(
-    recommendedSource?.tokenAddress || USDC_ADDRESSES[LIFI_SUPPORTED_CHAIN_IDS.ETHEREUM_MAINNET] || ''
+    preselectedRoute?.sourceTokenAddress || recommendedSource?.tokenAddress || USDC_ADDRESSES[LIFI_SUPPORTED_CHAIN_IDS.ETHEREUM_MAINNET] || ''
   );
   const [fromTokenSymbol, setFromTokenSymbol] = useState<string>(
-    recommendedSource?.tokenSymbol || 'USDC'
+    preselectedRoute?.sourceToken || recommendedSource?.tokenSymbol || 'USDC'
   );
   const [availableTokens, setAvailableTokens] = useState<any[]>([]);
   const [isLoadingTokens, setIsLoadingTokens] = useState(false);
@@ -74,14 +85,18 @@ export function LiFiBridgeStep({
   // Convert amount prop (bigint) to USDC string for display
   const amountInUsdc = formatUnits(amount, 6);
 
-  // Initialize from recommendation
+  // Initialize from preselected route or recommendation
   useEffect(() => {
-    if (recommendedSource) {
+    if (preselectedRoute) {
+      setFromChainId(preselectedRoute.sourceChainId);
+      setFromTokenAddress(preselectedRoute.sourceTokenAddress);
+      setFromTokenSymbol(preselectedRoute.sourceToken);
+    } else if (recommendedSource) {
       setFromChainId(recommendedSource.chainId);
       setFromTokenAddress(recommendedSource.tokenAddress);
       setFromTokenSymbol(recommendedSource.tokenSymbol);
     }
-  }, [recommendedSource]);
+  }, [preselectedRoute, recommendedSource]);
 
   // Fetch user's tokens when chain changes
   useEffect(() => {
@@ -120,19 +135,97 @@ export function LiFiBridgeStep({
       .finally(() => setIsLoadingTokens(false));
   }, [address, fromChainId, recommendedSource, fromTokenAddress]);
 
-  // Auto-trigger route discovery if we have a recommendation
+  // Auto-trigger route discovery and execution when autoExecute is true
   useEffect(() => {
-    if (recommendedSource && address && fromTokenAddress === recommendedSource.tokenAddress) {
-       // Small delay to ensure state is settled
-       const timer = setTimeout(() => {
-         // Only fetch if idle
-         if (state === 'idle') {
+    if (autoExecute && preselectedRoute && address) {
+      const timer = setTimeout(() => {
+        if (state === 'idle') {
+          // Fetch routes first, then auto-select and execute
+          fetchRoutes();
+        }
+      }, 300);
+      return () => clearTimeout(timer);
+    } else if (!autoExecute) {
+      // Normal auto-trigger for manual mode
+      const shouldAutoTrigger =
+        (preselectedRoute && address && fromTokenAddress === preselectedRoute.sourceTokenAddress) ||
+        (recommendedSource && address && fromTokenAddress === recommendedSource.tokenAddress);
+
+      if (shouldAutoTrigger) {
+        const timer = setTimeout(() => {
+          if (state === 'idle') {
             fetchRoutes();
-         }
-       }, 500);
-       return () => clearTimeout(timer);
+          }
+        }, 500);
+        return () => clearTimeout(timer);
+      }
     }
-  }, [recommendedSource, address, fromTokenAddress]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [autoExecute, preselectedRoute, recommendedSource, address, fromTokenAddress, state]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-select when routes are fetched in autoExecute mode
+  useEffect(() => {
+    if (autoExecute && state === 'selecting' && routes.length > 0 && !selectedRoute) {
+      // Auto-select the first route (best match)
+      const bestRoute = routes[0].route;
+      setSelectedRoute(bestRoute);
+    }
+  }, [autoExecute, state, routes, selectedRoute]);
+
+  // Auto-execute when route is selected in autoExecute mode
+  useEffect(() => {
+    if (!autoExecute || !selectedRoute || state !== 'selecting') return;
+
+    // Execute the route directly
+    setState('executing');
+    setExecutionStatus('Preparing transaction...');
+
+    const execute = async () => {
+      try {
+        const executedRoute = await executeRoute(selectedRoute, {
+          updateRouteHook(updatedRoute) {
+            // Track execution progress
+            const currentStep = updatedRoute.steps?.find(
+              (step) => step.execution?.status === 'PENDING' || step.execution?.status === 'ACTION_REQUIRED'
+            );
+
+            if (currentStep?.execution?.status === 'ACTION_REQUIRED') {
+              setExecutionStatus('Please confirm in your wallet...');
+            } else if (currentStep) {
+              setExecutionStatus(`Executing: ${currentStep.action?.fromToken?.symbol} → ${currentStep.action?.toToken?.symbol}`);
+            }
+
+            // Check for tx hash
+            const process = currentStep?.execution?.process?.[0];
+            if (process?.txHash) {
+              onBridgeStarted(process.txHash);
+            }
+          },
+          acceptExchangeRateUpdateHook: async () => true, // Auto-accept rate changes
+        });
+
+        setState('completed');
+        setExecutionStatus('Bridge completed!');
+        onBridgeCompleted();
+      } catch (err: any) {
+        console.error('Bridge execution failed:', err);
+
+        // Detect gas balance errors and provide clear message
+        let errorMessage = err.message || 'Bridge execution failed';
+        if (err.message?.includes('balance is too low') || err.message?.includes('insufficient funds') || err.message?.includes('BalanceError')) {
+          const chainInfo = sourceChains.find(c => c.id === fromChainId);
+          const nativeToken = chainInfo?.nativeToken || 'ETH';
+          const chainName = chainInfo?.name || 'source chain';
+          errorMessage = `Insufficient ${nativeToken} for gas fees on ${chainName}. You need a small amount of ${nativeToken} (~$1-2) to pay for transaction fees, even when bridging USDC.`;
+        }
+
+        setError(errorMessage);
+        setState('error');
+        onError(new Error(errorMessage));
+      }
+    };
+
+    execute();
+  }, [autoExecute, selectedRoute, state]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Configure SDK on mount
   useEffect(() => {
@@ -265,12 +358,14 @@ export function LiFiBridgeStep({
   return (
     <div className="w-full space-y-4">
       {/* Info Banner */}
-      <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-        <p className="text-sm text-blue-300">
-          Funds will be sent directly to the contract address:
-        </p>
-        <code className="text-xs text-blue-400 break-all">{destinationAddress}</code>
-      </div>
+      {!autoExecute && (
+        <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+          <p className="text-sm text-blue-300">
+            Funds will be sent directly to the contract address:
+          </p>
+          <code className="text-xs text-blue-400 break-all">{destinationAddress}</code>
+        </div>
+      )}
 
       {/* Error Display */}
       {error && (
@@ -280,7 +375,7 @@ export function LiFiBridgeStep({
       )}
 
       {/* Source Chain & Amount Selection */}
-      {(state === 'idle' || state === 'loading-routes' || state === 'error') && (
+      {!autoExecute && (state === 'idle' || state === 'loading-routes' || state === 'error') && (
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-2">Source Chain</label>
@@ -301,7 +396,8 @@ export function LiFiBridgeStep({
           <div>
             <label className="block text-sm font-medium mb-2">
               Source Token
-              {recommendedSource && fromTokenAddress === recommendedSource.tokenAddress && (
+              {((preselectedRoute && fromTokenAddress === preselectedRoute.sourceTokenAddress) ||
+                (recommendedSource && fromTokenAddress === recommendedSource.tokenAddress)) && (
                 <span className="ml-2 text-xs bg-[#CCFF00] border border-black px-2 py-0.5 font-bold">
                   AI PICK
                 </span>
@@ -362,7 +458,7 @@ export function LiFiBridgeStep({
       )}
 
       {/* Route Selection */}
-      {state === 'selecting' && routes.length > 0 && (
+      {!autoExecute && state === 'selecting' && routes.length > 0 && (
         <div className="space-y-3">
           <h4 className="font-medium">Select a Route</h4>
           {routes.map((option, index) => (

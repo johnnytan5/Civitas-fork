@@ -87,6 +87,7 @@ export interface Route {
   tool: string;
   steps: number;
   action?: any;
+  isDirect?: boolean; // Flag for direct transfer (no bridge)
 }
 
 export interface ScanResult {
@@ -101,6 +102,14 @@ export interface RouteAnalysisResult {
     bestRoute: Route;
     reason: string;
   };
+}
+
+export interface ScanProgress {
+  step: 'wallet' | 'routes' | 'comparing';
+  message: string;
+  chainsScanned?: number;
+  tokensFound?: number;
+  routesCalculated?: number;
 }
 
 /**
@@ -278,14 +287,30 @@ export async function getOptimalFundingRoutes(
 export async function scanAndFindBestRoutes(
   walletAddress: string,
   destinationAddress: string,
-  amount: string
+  amount: string,
+  onProgress?: (progress: ScanProgress) => void
 ): Promise<RouteAnalysisResult> {
   // 1. Scan wallet balances
+  onProgress?.({
+    step: 'wallet',
+    message: 'Scanning your wallet across 5 chains...',
+  });
+
   const scanResult = await scanWalletBalances(walletAddress);
 
   if (!scanResult || scanResult.balances.length === 0) {
     throw new Error('No funds found on supported chains');
   }
+
+  // Count tokens found
+  const tokensFound = scanResult.balances.reduce((sum, chain) => sum + chain.balances.length, 0);
+
+  onProgress?.({
+    step: 'wallet',
+    message: `Found ${tokensFound} token(s) on ${scanResult.totalChainsFound} chain(s)`,
+    chainsScanned: scanResult.totalChainsFound,
+    tokensFound,
+  });
 
   // 2. Prepare candidates (flatten balances)
   const candidateTokens: CandidateToken[] = [];
@@ -301,10 +326,20 @@ export async function scanAndFindBestRoutes(
     });
   });
 
+  // Check if user has USDC on Base (direct transfer option)
+  const baseBalance = scanResult.balances.find(b => b.chainId === 8453);
+  const usdcOnBase = baseBalance?.balances.find(t => t.symbol === 'USDC');
+  const hasDirectTransfer = usdcOnBase && parseFloat(usdcOnBase.amount) >= parseFloat(amount);
+
   // Limit to top 5 to avoid API rate limits
   const topCandidates = candidateTokens.slice(0, 5);
 
   // 3. Get routes
+  onProgress?.({
+    step: 'routes',
+    message: 'Calculating optimal routes via LI.FI...',
+  });
+
   const routeResult = await getOptimalFundingRoutes(
     walletAddress,
     destinationAddress,
@@ -315,6 +350,37 @@ export async function scanAndFindBestRoutes(
   if (!routeResult) {
     throw new Error('No valid routes found via LI.FI');
   }
+
+  // Add direct transfer as a route option if available
+  if (hasDirectTransfer && usdcOnBase) {
+    routeResult.routes.push({
+      sourceChainId: 8453,
+      sourceToken: 'USDC',
+      sourceTokenAddress: USDC_ADDRESS[8453],
+      gasCostUsd: '0.01', // Minimal Base gas
+      executionDuration: 10, // Seconds
+      tool: 'Direct Transfer',
+      steps: 1,
+      isDirect: true,
+    } as Route & { isDirect: boolean });
+
+    // Re-sort with direct transfer included
+    routeResult.routes.sort((a, b) => parseFloat(a.gasCostUsd) - parseFloat(b.gasCostUsd));
+
+    // Update recommendation if direct transfer is now cheapest
+    if (routeResult.routes[0].tool === 'Direct Transfer') {
+      routeResult.recommendation = {
+        bestRoute: routeResult.routes[0],
+        reason: 'Fastest and cheapest: Direct USDC transfer on Base (no bridge needed)'
+      };
+    }
+  }
+
+  onProgress?.({
+    step: 'comparing',
+    message: `Comparing ${routeResult.routes.length} route(s)...`,
+    routesCalculated: routeResult.routes.length,
+  });
 
   return routeResult;
 }
