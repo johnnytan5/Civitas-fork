@@ -27,29 +27,15 @@ export async function POST(req: Request) {
       chainId as number | undefined
     );
 
-    console.log('[API] Chat Request:', {
-      templateId,
-      walletAddress,
-      chainId,
-      messageCount: messages?.length
-    });
-    console.log('[API] System Prompt snippet:', systemPrompt.substring(0, 200));
-    if (walletAddress) {
-      console.log('[API] Wallet Address present in prompt:', systemPrompt.includes(walletAddress));
-    }
-
     // Get configured provider (local proxy in dev, official API in production)
     const google = getGoogleProvider();
 
     // Convert UI messages to model messages
     // Note: In ai@6.0.72, this is async and must be awaited
     // Pass tools to handle multi-modal tool responses properly
-    console.log('[API] Converting messages, count:', messages.length);
     const modelMessages = await convertToModelMessages(messages, {
       tools: civitasTools,
     });
-    console.log('[API] Converted to ModelMessage[], count:', modelMessages.length);
-    console.log('[API] First message:', modelMessages[0] ? JSON.stringify(modelMessages[0]) : 'none');
 
     // Pass converted messages to streamText
     const result = streamText({
