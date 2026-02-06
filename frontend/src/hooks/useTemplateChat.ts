@@ -1,7 +1,8 @@
 'use client';
 
 import { useChat } from '@ai-sdk/react';
-import { useState, useEffect } from 'react';
+import { DefaultChatTransport } from 'ai';
+import { useState, useEffect, useMemo } from 'react';
 import { useAccount, useChainId } from 'wagmi';
 import { templateRegistry } from '@/lib/templates/registry';
 import type { TemplateDefinition } from '@/lib/templates/types';
@@ -40,47 +41,49 @@ export function useTemplateChat() {
     console.log('[useTemplateChat] Active Template:', activeTemplate?.id);
   }, [walletAddress, activeTemplate]);
 
+  // Create transport with dynamic body that updates with dependencies
+  const transport = useMemo(() => {
+    return new DefaultChatTransport({
+      api: '/api/chat',
+      body: {
+        templateId: activeTemplate?.id,
+        timezone,
+        walletAddress,
+        chainId,
+      },
+    });
+  }, [activeTemplate?.id, timezone, walletAddress, chainId]);
+
   const chatResult = useChat({
-    api: '/api/chat',
-    body: {
-      templateId: activeTemplate?.id,
-      timezone, // Pass timezone to API
-      walletAddress, // Pass connected wallet address
-      chainId, // Pass chain ID for network-aware context
-    },
+    transport,
   });
 
-  const { messages, setMessages, handleSubmit, sendMessage, status } = chatResult;
+  const { messages, setMessages, sendMessage, status } = chatResult;
 
-  // Use hook-provided input/setInput if available, otherwise use local state
-  const input = chatResult.input ?? localInput;
-  const setInput = chatResult.setInput ?? setLocalInput;
-  const handleInputChange = chatResult.handleInputChange ?? ((e: React.ChangeEvent<HTMLInputElement>) => {
+  // Manual input/handleSubmit for v6 compatibility
+  const input = localInput;
+  const setInput = setLocalInput;
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setLocalInput(e.target.value);
-  });
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (localInput.trim()) {
+      sendMessage({ text: localInput });
+      setLocalInput('');
+    }
+  };
 
   // In AI SDK v6, sendMessage replaces append
   // Create wrapper to match the old append API for backward compatibility
   const append = async (message: { role: string; content: string }) => {
-    // Force fresh body with latest state
-    const requestBody = {
-      templateId: activeTemplate?.id,
-      timezone,
-      walletAddress,
-      chainId,
-    };
-
-    if (chatResult.append) {
-      console.log('[useTemplateChat] Appending with explicit body:', requestBody);
-      return chatResult.append(message, { body: requestBody });
-    }
-
     if (sendMessage) {
-      console.log('[useTemplateChat] Sending message with explicit body fallback:', requestBody);
-      // @ts-ignore - Try passing options if supported, though types might conflict
-      return sendMessage({ text: message.content }, { body: requestBody });
+      console.log('[useTemplateChat] Sending message via append wrapper');
+      return sendMessage({ text: message.content });
     }
-    throw new Error('No send method available (append/sendMessage missing)');
+    throw new Error('sendMessage not available');
   };
 
   const isLoading = status !== 'ready';
@@ -88,26 +91,14 @@ export function useTemplateChat() {
   // Helper to extract text from message content
   const getMessageText = (message: typeof messages[number]) => {
     console.log('[getMessageText] message structure:', {
-      hasContent: !!message.content,
-      contentType: typeof message.content,
-      isArray: Array.isArray(message.content),
-      hasParts: !!(message as any).parts,
-      partsType: typeof (message as any).parts,
+      hasParts: !!message.parts,
+      partsType: typeof message.parts,
+      partsLength: Array.isArray(message.parts) ? message.parts.length : 0,
     });
 
-    if (typeof message.content === 'string') {
-      return message.content;
-    }
-    // Handle array of content parts
-    if (Array.isArray(message.content)) {
-      return message.content
-        .filter(part => part.type === 'text')
-        .map(part => part.text)
-        .join(' ');
-    }
-    // AI SDK v6: Handle parts array at message level
-    if (Array.isArray((message as any).parts)) {
-      return (message as any).parts
+    // AI SDK v6: Messages use parts array
+    if (Array.isArray(message.parts)) {
+      return message.parts
         .filter((part: any) => part.type === 'text')
         .map((part: any) => part.text)
         .join(' ');

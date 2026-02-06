@@ -272,13 +272,30 @@ export function transformConfigToDeployParams(
     case 'rent-vault': {
       const c = config as RentVaultConfig;
 
+      // Validate required fields
+      if (!c.rentAmount) {
+        throw new Error('rentAmount is required for RentVault');
+      }
+      if (!c.dueDate) {
+        throw new Error('dueDate is required for RentVault');
+      }
+      if (!c.recipient) {
+        throw new Error('recipient is required for RentVault');
+      }
+      if (!c.tenants || c.tenants.length === 0) {
+        throw new Error('tenants array is required for RentVault');
+      }
+      if (!c.shareBps || c.shareBps.length === 0) {
+        throw new Error('shareBps array is required for RentVault');
+      }
+
       // Parse rent amount (could be string with commas or just a number string)
       const rentAmountStr = c.rentAmount.replace(/,/g, '');
       const rentAmount = parseUnits(rentAmountStr, 6);
 
       // Parse due date with validation
       const dueDate = parseDateToBigInt(c.dueDate, 'due date');
-      
+
       // Convert shareBps to bigint array
       const shareBps = c.shareBps.map(s => BigInt(s));
       
@@ -293,6 +310,23 @@ export function transformConfigToDeployParams(
 
     case 'group-buy-escrow': {
       const c = config as GroupBuyEscrowConfig;
+
+      // Validate required fields
+      if (!c.recipient) {
+        throw new Error('recipient is required for GroupBuyEscrow');
+      }
+      if (!c.fundingGoal) {
+        throw new Error('fundingGoal is required for GroupBuyEscrow');
+      }
+      if (!c.expiryDate) {
+        throw new Error('expiryDate is required for GroupBuyEscrow');
+      }
+      if (!c.participants || c.participants.length === 0) {
+        throw new Error('participants array is required for GroupBuyEscrow');
+      }
+      if (!c.shareBps || c.shareBps.length === 0) {
+        throw new Error('shareBps array is required for GroupBuyEscrow');
+      }
 
       // Parse funding goal
       const fundingGoalStr = c.fundingGoal.replace(/,/g, '');
@@ -330,6 +364,17 @@ export function transformConfigToDeployParams(
 
     case 'stable-allowance-treasury': {
       const c = config as StableAllowanceTreasuryConfig;
+
+      // Validate required fields
+      if (!c.owner) {
+        throw new Error('owner is required for StableAllowanceTreasury');
+      }
+      if (!c.recipient) {
+        throw new Error('recipient is required for StableAllowanceTreasury');
+      }
+      if (!c.allowancePerIncrement) {
+        throw new Error('allowancePerIncrement is required for StableAllowanceTreasury');
+      }
 
       // Parse allowance amount
       const allowanceStr = c.allowancePerIncrement.replace(/,/g, '');
