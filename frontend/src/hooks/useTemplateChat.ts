@@ -20,9 +20,6 @@ export function useTemplateChat() {
   const [extractedConfig, setExtractedConfig] = useState<any>({});
   const [configCompleteness, setConfigCompleteness] = useState(0);
   const [isExtracting, setIsExtracting] = useState(false);
-  const [input, setInput] = useState('');
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
 
   // Detect user's timezone from browser
   const timezone = useUserTimezone();
@@ -34,14 +31,36 @@ export function useTemplateChat() {
   // Active template is manual selection or AI detection
   const activeTemplate = manualTemplate || detectedTemplate;
 
-  const { messages, setMessages, status } = useChat({
+  // Manual input state management (as fallback for v6 compatibility)
+  const [localInput, setLocalInput] = useState('');
+
+  const chatResult = useChat({
     api: '/api/chat',
     body: {
       templateId: activeTemplate?.id,
       timezone, // Pass timezone to API
       walletAddress, // Pass connected wallet address
+      chainId, // Pass chain ID for network-aware context
     },
   });
+
+  const { messages, setMessages, handleSubmit, sendMessage, status } = chatResult;
+
+  // Use hook-provided input/setInput if available, otherwise use local state
+  const input = chatResult.input ?? localInput;
+  const setInput = chatResult.setInput ?? setLocalInput;
+  const handleInputChange = chatResult.handleInputChange ?? ((e: React.ChangeEvent<HTMLInputElement>) => {
+    setLocalInput(e.target.value);
+  });
+
+  // In AI SDK v6, sendMessage replaces append
+  // Create wrapper to match the old append API for backward compatibility
+  const append = async (message: { role: string; content: string }) => {
+    if (sendMessage) {
+      return sendMessage({ text: message.content });
+    }
+    throw new Error('sendMessage is not available');
+  };
 
   const isLoading = status !== 'ready';
 
@@ -170,6 +189,7 @@ export function useTemplateChat() {
 
     // Actions
     resetChat,
+    append,
 
     // Helpers
     getMessageText,

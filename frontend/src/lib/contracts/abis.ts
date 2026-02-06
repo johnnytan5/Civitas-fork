@@ -137,6 +137,23 @@ export const CIVITAS_FACTORY_ABI = [
     stateMutability: 'view',
   },
   {
+    type: 'function',
+    name: 'isBasenameAvailable',
+    inputs: [{ name: 'basename', type: 'string', internalType: 'string' }],
+    outputs: [{ name: '', type: 'bool', internalType: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'generateUniqueBasename',
+    inputs: [
+      { name: 'basename', type: 'string', internalType: 'string' },
+      { name: 'contractAddress', type: 'address', internalType: 'address' },
+    ],
+    outputs: [{ name: '', type: 'string', internalType: 'string' }],
+    stateMutability: 'pure',
+  },
+  {
     type: 'event',
     name: 'ENSRecordsSet',
     inputs: [

@@ -30,8 +30,15 @@ export async function POST(req: Request) {
     // Get configured provider (local proxy in dev, official API in production)
     const google = getGoogleProvider();
 
-    // Convert UI messages to model messages (async function)
-    const modelMessages = await convertToModelMessages(messages);
+    // Convert UI messages to model messages
+    // Note: In ai@6.0.72, this is async and must be awaited
+    // Pass tools to handle multi-modal tool responses properly
+    console.log('[API] Converting messages, count:', messages.length);
+    const modelMessages = await convertToModelMessages(messages, {
+      tools: civitasTools,
+    });
+    console.log('[API] Converted to ModelMessage[], count:', modelMessages.length);
+    console.log('[API] First message:', modelMessages[0] ? JSON.stringify(modelMessages[0]) : 'none');
 
     // Pass converted messages to streamText
     const result = streamText({

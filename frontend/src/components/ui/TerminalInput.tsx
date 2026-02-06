@@ -20,8 +20,12 @@ export function TerminalInput({
 }: TerminalInputProps) {
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
+    console.log('[TerminalInput] handleSubmit triggered', { disabled, value, hasSubmit: !!onSubmit });
     if (!disabled && value?.trim()) {
+      console.log('[TerminalInput] calling onSubmit prop');
       onSubmit();
+    } else {
+      console.warn('[TerminalInput] submission blocked', { disabled, valueEmpty: !value?.trim() });
     }
   };
 
