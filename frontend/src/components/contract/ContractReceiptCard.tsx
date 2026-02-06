@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { CheckCircle2, AlertCircle } from 'lucide-react'
+import { CheckCircle2, AlertCircle, Scissors } from 'lucide-react'
 import type { TemplateDefinition } from '@/lib/templates/types'
+import { formatAddress } from '@/lib/ens/resolver'
 import { formatUnits } from 'viem'
 import { getContractSource } from '@/lib/contracts/source-code'
 import { highlightSolidity } from '@/lib/utils/syntax-highlight'
@@ -15,6 +16,8 @@ interface ContractReceiptCardProps {
   isDeploying?: boolean
   isSuccess?: boolean
   deployedAddress?: string
+  ensName?: string | null
+  ensDomain?: string
 }
 
 export function ContractReceiptCard({
@@ -25,6 +28,8 @@ export function ContractReceiptCard({
   isDeploying = false,
   isSuccess = false,
   deployedAddress,
+  ensName,
+  ensDomain,
 }: ContractReceiptCardProps) {
   const [completeness, setCompleteness] = useState(0)
   const [isPressed, setIsPressed] = useState(false)
@@ -291,81 +296,142 @@ export function ContractReceiptCard({
                   })}
                 </div>
 
-                {/* Barcode (Stable) */}
-                <div className="p-6 flex justify-center flex-col items-center">
-                  <div className="flex gap-[2px] h-12 mb-6">
-                    {barcodeHeights.map((height, i) => (
-                      <div
-                        key={i}
-                        className="w-[3px] bg-black"
-                        style={{ height: `${height}%` }}
-                      />
-                    ))}
+                {/* Barcode & Identity Section */}
+                <div>
+                  {/* Barcode (Stable) */}
+                  <div className="p-6 pb-0 flex justify-center">
+                    <div className="flex gap-[2px] h-12 w-full justify-center">
+                      {barcodeHeights.map((height, i) => (
+                        <div
+                          key={i}
+                          className="w-[3px] bg-black"
+                          style={{ height: `${height}%` }}
+                        />
+                      ))}
+                    </div>
                   </div>
 
-                  {/* Basename Customization Section */}
-                  {!isSuccess && (
-                    <div className="w-full border-t-[2px] border-dashed border-black pt-6">
-                      <button
-                        onClick={() => setCustomizeBasename(!customizeBasename)}
-                        className="group flex items-center gap-3 text-xs font-mono font-bold uppercase hover:text-cyan-600 transition-colors mb-4 w-full"
-                      >
-                        <div className={`
-                          w-5 h-5 border-[2px] border-black flex items-center justify-center transition-all duration-200
-                          ${customizeBasename ? 'bg-cyan-400 shadow-[2px_2px_0px_#000]' : 'bg-white group-hover:shadow-[2px_2px_0px_#000]'}
-                        `}>
-                          {customizeBasename && <CheckCircle2 className="w-3 h-3 text-black" />}
+                  {/* Identity Badge (Success) OR Input (Draft) */}
+                  {isSuccess && ensName ? (
+                    <div className="mt-6">
+                      {/* Tear-off Divider */}
+                      <div className="relative border-b-[3px] border-dashed border-black mx-[-2px] mb-[-2px] z-10">
+                        <div className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#FAF9F6] px-2">
+                          <Scissors className="w-4 h-4 text-black transform -rotate-90" />
                         </div>
-                        <span className="tracking-wider">Assign Custom Identity</span>
-                      </button>
+                        <div className="absolute right-2 -top-5 text-[10px] font-mono font-bold text-black/40 rotate-180">
+                          OFFICIAL RECORD
+                        </div>
+                      </div>
 
-                      {customizeBasename && (
-                        <div className="space-y-3 animate-in slide-in-from-top-2 duration-300">
-                          <div className={`
-                            relative bg-white border-[2px] border-black p-1 transition-all duration-200
-                            ${basenameError ? 'shadow-[4px_4px_0px_#EF4444]' : 'shadow-[4px_4px_0px_#000] focus-within:shadow-[2px_2px_0px_#000] focus-within:translate-x-[2px] focus-within:translate-y-[2px]'}
-                          `}>
-                            {/* "Rivets" */}
-                            <div className="absolute top-1 left-1 w-1 h-1 bg-black rounded-full opacity-20" />
-                            <div className="absolute top-1 right-1 w-1 h-1 bg-black rounded-full opacity-20" />
-                            <div className="absolute bottom-1 left-1 w-1 h-1 bg-black rounded-full opacity-20" />
-                            <div className="absolute bottom-1 right-1 w-1 h-1 bg-black rounded-full opacity-20" />
+                      {/* The Badge */}
+                      <div className="bg-cyan-400 p-5 relative overflow-hidden group cursor-pointer border-t-[3px] border-black"
+                           onClick={() => navigator.clipboard.writeText(`${ensName}.${ensDomain}`)}>
 
-                            <div className="px-3 py-2">
-                              <label className="block text-[10px] font-mono font-bold uppercase text-gray-400 mb-1 tracking-widest">
-                                Basename ID
-                              </label>
-                              <div className="flex items-center">
-                                <input
-                                  type="text"
-                                  value={customBasename}
-                                  onChange={(e) => {
-                                    setCustomBasename(e.target.value.toLowerCase())
-                                  }}
-                                  placeholder="your-name"
-                                  className="w-full font-headline text-lg uppercase bg-transparent outline-none placeholder:text-gray-200 text-black"
-                                />
-                                <div className="font-headline text-lg text-black/30 pointer-events-none select-none">
-                                  .civitas...
+                        {/* Decorative "Rivets" */}
+                        <div className="absolute top-3 left-3 w-1.5 h-1.5 bg-black rounded-full opacity-20" />
+                        <div className="absolute top-3 right-3 w-1.5 h-1.5 bg-black rounded-full opacity-20" />
+                        <div className="absolute bottom-3 left-3 w-1.5 h-1.5 bg-black rounded-full opacity-20" />
+                        <div className="absolute bottom-3 right-3 w-1.5 h-1.5 bg-black rounded-full opacity-20" />
+
+                        {/* Top Label */}
+                        <div className="flex items-center justify-between mb-3 border-b-2 border-black/10 pb-2">
+                          <span className="font-mono text-[10px] uppercase font-bold tracking-widest text-black/60">
+                            Verified Identity
+                          </span>
+                          <div className="bg-black text-white text-[9px] font-bold px-1.5 py-0.5 uppercase tracking-wider" style={{ color: '#FFFFFF' }}>
+                            Official
+                          </div>
+                        </div>
+
+                        {/* Main Identity Name */}
+                        <div className="text-center py-2 relative">
+                          <p className="font-headline text-2xl uppercase text-black leading-none break-all group-hover:scale-105 transition-transform duration-200">
+                            {ensName}
+                          </p>
+                          <p className="font-mono text-xs font-bold text-black/50 mt-1">
+                            .{ensDomain}
+                          </p>
+                        </div>
+
+                        {/* Bottom Detail (Address) */}
+                        <div className="mt-3 pt-3 border-t-2 border-black/10 flex items-center justify-between">
+                          <div className="font-mono text-[10px] text-black/60">
+                            ID: <span className="font-bold text-black">{deployedAddress ? formatAddress(deployedAddress) : '...'}</span>
+                          </div>
+                          <div className="font-mono text-[9px] text-black/40">
+                            {new Date().getFullYear()}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    /* Basename Customization Section (Draft) */
+                    !isSuccess && (
+                      <div className="p-6 pt-6">
+                        <div className="w-full border-t-[2px] border-dashed border-black pt-6">
+                          <button
+                            onClick={() => setCustomizeBasename(!customizeBasename)}
+                            className="group flex items-center gap-3 text-xs font-mono font-bold uppercase hover:text-cyan-600 transition-colors mb-4 w-full"
+                          >
+                            <div className={`
+                              w-5 h-5 border-[2px] border-black flex items-center justify-center transition-all duration-200
+                              ${customizeBasename ? 'bg-cyan-400 shadow-[2px_2px_0px_#000]' : 'bg-white group-hover:shadow-[2px_2px_0px_#000]'}
+                            `}>
+                              {customizeBasename && <CheckCircle2 className="w-3 h-3 text-black" />}
+                            </div>
+                            <span className="tracking-wider">Assign Custom Identity</span>
+                          </button>
+
+                          {customizeBasename && (
+                            <div className="space-y-3 animate-in slide-in-from-top-2 duration-300">
+                              <div className={`
+                                relative bg-white border-[2px] border-black p-1 transition-all duration-200
+                                ${basenameError ? 'shadow-[4px_4px_0px_#EF4444]' : 'shadow-[4px_4px_0px_#000] focus-within:shadow-[2px_2px_0px_#000] focus-within:translate-x-[2px] focus-within:translate-y-[2px]'}
+                              `}>
+                                {/* "Rivets" */}
+                                <div className="absolute top-1 left-1 w-1 h-1 bg-black rounded-full opacity-20" />
+                                <div className="absolute top-1 right-1 w-1 h-1 bg-black rounded-full opacity-20" />
+                                <div className="absolute bottom-1 left-1 w-1 h-1 bg-black rounded-full opacity-20" />
+                                <div className="absolute bottom-1 right-1 w-1 h-1 bg-black rounded-full opacity-20" />
+
+                                <div className="px-3 py-2">
+                                  <label className="block text-[10px] font-mono font-bold uppercase text-gray-400 mb-1 tracking-widest">
+                                    Basename ID
+                                  </label>
+                                  <div className="flex items-center">
+                                    <input
+                                      type="text"
+                                      value={customBasename}
+                                      onChange={(e) => {
+                                        setCustomBasename(e.target.value.toLowerCase())
+                                      }}
+                                      placeholder="your-name"
+                                      className="w-full font-headline text-lg uppercase bg-transparent outline-none placeholder:text-gray-200 text-black"
+                                    />
+                                    <div className="font-headline text-lg text-black/30 pointer-events-none select-none">
+                                      .civitas...
+                                    </div>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          </div>
 
-                          {basenameError ? (
-                            <div className="flex items-center gap-2 text-xs text-red-600 font-mono font-bold bg-red-50 border border-red-200 p-2">
-                              <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                              <span>{basenameError}</span>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-2 text-[10px] text-gray-500 font-mono pl-1">
-                              <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-                              <span>Ready for verification</span>
+                              {basenameError ? (
+                                <div className="flex items-center gap-2 text-xs text-red-600 font-mono font-bold bg-red-50 border border-red-200 p-2">
+                                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                                  <span>{basenameError}</span>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-2 text-[10px] text-gray-500 font-mono pl-1">
+                                  <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+                                  <span>Ready for verification</span>
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    )
                   )}
                 </div>
               </div>

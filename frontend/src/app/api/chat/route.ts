@@ -27,15 +27,15 @@ export async function POST(req: Request) {
       chainId as number | undefined
     );
 
-    console.log('[API] Chat Request:', {
+    // DEBUG: Trace wallet address
+    console.log('[API] Chat Request Body:', {
       templateId,
       walletAddress,
-      chainId,
-      messageCount: messages?.length
+      hasWalletAddress: !!walletAddress
     });
-    console.log('[API] System Prompt snippet:', systemPrompt.substring(0, 200));
+    console.log('[API] System Prompt has wallet:', systemPrompt.includes('Connected Wallet Address:'));
     if (walletAddress) {
-      console.log('[API] Wallet Address present in prompt:', systemPrompt.includes(walletAddress));
+      console.log('[API] System Prompt includes explicit address:', systemPrompt.includes(walletAddress));
     }
 
     // Get configured provider (local proxy in dev, official API in production)
@@ -44,12 +44,9 @@ export async function POST(req: Request) {
     // Convert UI messages to model messages
     // Note: In ai@6.0.72, this is async and must be awaited
     // Pass tools to handle multi-modal tool responses properly
-    console.log('[API] Converting messages, count:', messages.length);
     const modelMessages = await convertToModelMessages(messages, {
       tools: civitasTools,
     });
-    console.log('[API] Converted to ModelMessage[], count:', modelMessages.length);
-    console.log('[API] First message:', modelMessages[0] ? JSON.stringify(modelMessages[0]) : 'none');
 
     // Pass converted messages to streamText
     const result = streamText({
