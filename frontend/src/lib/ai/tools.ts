@@ -4,6 +4,7 @@ import { createPublicClient, http, isAddress as viemIsAddress, formatUnits, pars
 import { base, baseSepolia } from 'viem/chains';
 import { USDC_ADDRESS, USDC_DECIMALS } from '@/lib/contracts/constants';
 import { isENSName, isAddress, formatAddress, resolveENSDirect } from '@/lib/ens/resolver';
+import { templateRegistry } from '@/lib/templates/registry';
 import {
   scanWalletBalances as scanWalletBalancesLogic,
   getOptimalFundingRoutes as getOptimalFundingRoutesLogic,
@@ -463,6 +464,33 @@ const getOptimalFundingRoute = tool({
 });
 
 /**
+ * Select the appropriate contract template based on user intent
+ */
+const selectTemplate = tool({
+  description:
+    'Select the appropriate contract template based on the user\'s needs. ' +
+    'Call when confident about which template fits. If unsure, ask a clarifying question first.',
+  inputSchema: z.object({
+    templateId: z.enum(['rent-vault', 'group-buy-escrow', 'stable-allowance-treasury']),
+    confidence: z.enum(['high', 'medium']),
+    reasoning: z.string().describe('Brief explanation of why this template fits'),
+  }),
+  execute: async ({ templateId, confidence, reasoning }) => {
+    const template = templateRegistry.get(templateId);
+    if (!template) {
+      return { success: false, error: `Unknown template: ${templateId}` };
+    }
+    return {
+      success: true,
+      templateId: template.id,
+      templateName: template.name,
+      confidence,
+      reasoning,
+    };
+  },
+});
+
+/**
  * All available tools for the Civitas AI agent
  */
 export const civitasTools = {
@@ -471,4 +499,5 @@ export const civitasTools = {
   validateAddress,
   scanWalletBalances,
   getOptimalFundingRoute,
+  selectTemplate,
 };

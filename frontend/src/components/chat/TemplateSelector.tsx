@@ -8,6 +8,7 @@ interface TemplateSelectorProps {
   templates: TemplateDefinition[]
   onSelect: (templateId: string) => void
   detectedTemplate?: TemplateDefinition | null
+  detectionConfidence?: 'high' | 'medium' | null
 }
 
 const iconMap = {
@@ -27,6 +28,7 @@ export function TemplateSelector({
   templates,
   onSelect,
   detectedTemplate,
+  detectionConfidence,
 }: TemplateSelectorProps) {
   const [pressedId, setPressedId] = useState<string | null>(null)
 
@@ -44,11 +46,16 @@ export function TemplateSelector({
 
       {/* AI Detection Banner */}
       {detectedTemplate && (
-        <div className="mb-6 bg-[#CCFF00] border-[3px] border-black p-4 shadow-[4px_4px_0px_#000]">
+        <div className={`mb-6 border-[3px] border-black p-4 shadow-[4px_4px_0px_#000] ${
+          detectionConfidence === 'medium' ? 'bg-[#FFD600]' : 'bg-[#CCFF00]'
+        }`}>
           <div className="flex items-center gap-2">
             <Sparkles className="w-5 h-5" />
             <p className="font-mono text-sm">
-              <span className="font-black">[AI DETECTED]</span> {detectedTemplate.name} — Click to confirm
+              <span className="font-black">
+                {detectionConfidence === 'medium' ? '[AI SUGGESTED]' : '[AI DETECTED]'}
+              </span>{' '}
+              {detectedTemplate.name} — Click to confirm
             </p>
           </div>
         </div>

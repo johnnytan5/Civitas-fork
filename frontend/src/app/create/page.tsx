@@ -41,6 +41,7 @@ export default function CreatePage() {
     handleSubmit,
     isLoading,
     detectedTemplate,
+    detectionConfidence,
     activeTemplate,
     handleTemplateSelect,
     extractedConfig,
@@ -348,6 +349,7 @@ export default function CreatePage() {
                       templates={allTemplates}
                       onSelect={handleTemplateSelect}
                       detectedTemplate={detectedTemplate}
+                      detectionConfidence={detectionConfidence}
                     />
                   )}
                 </div>

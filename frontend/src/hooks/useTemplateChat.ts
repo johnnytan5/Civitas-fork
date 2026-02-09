@@ -1,8 +1,8 @@
 'use client';
 
 import { useChat } from '@ai-sdk/react';
-import { DefaultChatTransport, isToolUIPart } from 'ai';
-import { useState, useEffect, useMemo } from 'react';
+import { DefaultChatTransport, isToolUIPart, getToolName } from 'ai';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useAccount, useChainId } from 'wagmi';
 import { templateRegistry } from '@/lib/templates/registry';
 import type { TemplateDefinition } from '@/lib/templates/types';
@@ -21,6 +21,8 @@ export function useTemplateChat() {
   const [extractedConfig, setExtractedConfig] = useState<any>({});
   const [configCompleteness, setConfigCompleteness] = useState(0);
   const [isExtracting, setIsExtracting] = useState(false);
+  const [detectionConfidence, setDetectionConfidence] = useState<'high' | 'medium' | null>(null);
+  const processedTemplateToolCallIds = useRef<Set<string>>(new Set());
 
   // Detect user's timezone from browser
   const timezone = useUserTimezone();
@@ -116,26 +118,40 @@ export function useTemplateChat() {
     return '';
   };
 
-  // Auto-detect template from user messages
+  // Detect template from AI selectTemplate tool calls
   useEffect(() => {
-    if (messages.length > 0 && !detectedTemplate && !manualTemplate) {
-      const userMessages = messages.filter(m => m.role === 'user');
+    if (manualTemplate) return; // Manual selection takes priority
 
-      if (userMessages.length > 0) {
-        // Check the latest user message for intent
-        const lastUserMessage = userMessages[userMessages.length - 1];
-        const lastUserMessageText = getMessageText(lastUserMessage);
-        console.log('[Auto-detect] Checking latest user message:', lastUserMessageText);
+    for (const message of messages) {
+      if (message.role !== 'assistant' || !message.parts) continue;
 
-        const detected = templateRegistry.detectFromIntent(lastUserMessageText);
+      for (const part of message.parts) {
+        if (!isToolUIPart(part)) continue;
+        if (part.state !== 'output-available' || !part.output) continue;
+        if (processedTemplateToolCallIds.current.has(part.toolCallId)) continue;
 
-        if (detected) {
-          console.log('[Auto-detect] Detected template:', detected.id);
-          setDetectedTemplate(detected);
+        const toolName = getToolName(part);
+        if (toolName !== 'selectTemplate') continue;
+
+        processedTemplateToolCallIds.current.add(part.toolCallId);
+        const result = part.output as any;
+
+        if (result?.success) {
+          const template = templateRegistry.get(result.templateId);
+          if (template) {
+            console.log('[AI Tool-detect] Template selected:', result.templateId, 'confidence:', result.confidence);
+            // Reset config when template changes
+            if (detectedTemplate?.id !== template.id) {
+              setExtractedConfig({});
+              setConfigCompleteness(0);
+            }
+            setDetectedTemplate(template);
+            setDetectionConfidence(result.confidence);
+          }
         }
       }
     }
-  }, [messages, detectedTemplate, manualTemplate]);
+  }, [messages, manualTemplate, detectedTemplate]);
 
   // Auto-extract config after each AI response
   useEffect(() => {
@@ -210,6 +226,8 @@ export function useTemplateChat() {
     setManualTemplate(null);
     setExtractedConfig({});
     setConfigCompleteness(0);
+    setDetectionConfidence(null);
+    processedTemplateToolCallIds.current.clear();
     setMessages([]);
   };
 
@@ -226,6 +244,7 @@ export function useTemplateChat() {
 
     // Template state
     detectedTemplate,
+    detectionConfidence,
     manualTemplate,
     activeTemplate,
     handleTemplateSelect,

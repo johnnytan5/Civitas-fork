@@ -73,6 +73,8 @@ function getToolActionText(toolName: string): string {
       return 'Scanning wallet balances';
     case 'getOptimalFundingRoute':
       return 'Calculating optimal route';
+    case 'selectTemplate':
+      return 'Selecting template';
     default:
       return 'Processing';
   }
@@ -94,6 +96,8 @@ function renderToolResult(toolName: string, result: any): React.ReactNode {
       return renderScanBalancesResult(result);
     case 'getOptimalFundingRoute':
       return renderOptimalRouteResult(result);
+    case 'selectTemplate':
+      return renderSelectTemplateResult(result);
     default:
       return <span className="text-gray-600">Unknown tool: {toolName}</span>;
   }
@@ -303,6 +307,27 @@ function renderValidateAddressResult(result: any): React.ReactNode {
         <span className="inline-block rounded border border-black bg-white px-2 py-0.5 text-xs font-bold">
           {result.chainName}
         </span>
+      </div>
+    </div>
+  );
+}
+
+function renderSelectTemplateResult(result: any): React.ReactNode {
+  if (!result.success) {
+    return (
+      <div>
+        <div className="font-bold text-red-700">Template Selection Failed</div>
+        <div className="mt-1 text-red-600">{result.error || 'Unknown error'}</div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="font-bold text-green-700">Template Selected</div>
+      <div className="mt-1">
+        <span className="text-gray-700">Template:</span>{' '}
+        <span className="font-bold text-black">{result.templateName}</span>
       </div>
     </div>
   );
