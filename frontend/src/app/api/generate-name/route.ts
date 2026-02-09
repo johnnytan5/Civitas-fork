@@ -46,7 +46,7 @@ Generate a memorable, semantic subdomain name.`;
     const google = getGoogleProvider();
 
     const { object } = await generateObject({
-      model: google('gemini-2.5-flash-preview'),
+      model: google('gemini-2.5-flash'),
       schema: NameSuggestionSchema,
       prompt,
     });
