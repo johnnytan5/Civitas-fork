@@ -1589,7 +1589,7 @@ export async function POST(req: Request) {
        Ask what they want to create.`
 
   const result = await streamText({
-    model: google('gemini-3-flash'),
+    model: google('gemini-2.5-flash'),
     system: systemPrompt,
     messages,
   })
@@ -1621,7 +1621,7 @@ export async function POST(req: Request) {
   }
 
   const { object } = await generateObject({
-    model: google('gemini-3-flash'),
+    model: google('gemini-2.5-flash'),
     schema: template.parameterSchema,
     prompt: `Extract contract parameters from this conversation: ${JSON.stringify(messages)}
 
