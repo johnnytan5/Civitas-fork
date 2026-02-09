@@ -9,7 +9,7 @@ export function getPublicClient(chainId: number) {
   const chain = chainId === 8453 ? base : baseSepolia;
 
   const rpcUrl = chainId === 8453
-    ? (process.env.NEXT_PUBLIC_BASE_MAINNET_RPC_URL || 'https://mainnet.base.org')
+    ? (process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://base-rpc.publicnode.com')
     : (process.env.NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL || 'https://sepolia.base.org');
 
   return createPublicClient({

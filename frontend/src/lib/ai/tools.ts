@@ -1,7 +1,8 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 import { createPublicClient, http, isAddress as viemIsAddress, formatUnits, parseUnits } from 'viem';
-import { base, baseSepolia } from 'viem/chains';
+import { base, baseSepolia, mainnet, arbitrum, optimism, polygon } from 'viem/chains';
+import type { Chain } from 'viem';
 import { USDC_ADDRESS, USDC_DECIMALS } from '@/lib/contracts/constants';
 import { NATIVE_TOKEN_ADDRESS, ETH_DECIMALS } from '@/lib/lifi/constants';
 import { isENSName, isAddress, formatAddress, resolveENSDirect } from '@/lib/ens/resolver';
@@ -12,6 +13,23 @@ import {
   CHAIN_TOKENS,
   ERC20_ABI
 } from '@/lib/funding/routing';
+
+// Server-safe RPC URLs — mainnet.base.org blocks requests from cloud environments (Cloudflare WAF)
+const SERVER_RPC_URLS: Record<number, string> = {
+  [mainnet.id]: process.env.NEXT_PUBLIC_MAINNET_RPC_URL || 'https://ethereum-rpc.publicnode.com',
+  [base.id]: process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://base-rpc.publicnode.com',
+  [baseSepolia.id]: process.env.NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL || 'https://sepolia.base.org',
+  [arbitrum.id]: 'https://arbitrum-one-rpc.publicnode.com',
+  [optimism.id]: 'https://optimism-rpc.publicnode.com',
+  [polygon.id]: 'https://polygon-bor-rpc.publicnode.com',
+};
+
+function createServerClient(chain: Chain) {
+  return createPublicClient({
+    chain,
+    transport: http(SERVER_RPC_URLS[chain.id]),
+  });
+}
 
 /**
  * Resolve ENS names to Ethereum addresses
@@ -119,10 +137,7 @@ const checkBalance = tool({
       const usdcAddress = USDC_ADDRESS[chain.id];
 
       // Create public client
-      const client = createPublicClient({
-        chain,
-        transport: http(),
-      });
+      const client = createServerClient(chain);
 
       // Read USDC balance
       const balance = await client.readContract({
@@ -198,10 +213,7 @@ const validateAddress = tool({
       const chain = network === 'mainnet' ? base : baseSepolia;
 
       // Create public client
-      const client = createPublicClient({
-        chain,
-        transport: http(),
-      });
+      const client = createServerClient(chain);
 
       // Check if address has bytecode (is a contract)
       const bytecode = await client.getBytecode({
@@ -254,10 +266,7 @@ const scanWalletBalances = tool({
       CHAIN_TOKENS.map(async (chainConfig) => {
         try {
           console.log(`[scanWalletBalances] Checking chain: ${chainConfig.name} (${chainConfig.chain.id})`);
-          const client = createPublicClient({
-            chain: chainConfig.chain,
-            transport: http(),
-          });
+          const client = createServerClient(chainConfig.chain);
 
           const balances = await Promise.all(
             chainConfig.tokens.map(async (token) => {

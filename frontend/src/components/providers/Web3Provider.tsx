@@ -16,7 +16,7 @@ import { useWalletAuth } from '@/hooks/useWalletAuth';
 import '@rainbow-me/rainbowkit/styles.css';
 
 // Custom RPC URLs - these MUST be defined before config creation
-const BASE_MAINNET_RPC = process.env.NEXT_PUBLIC_BASE_MAINNET_RPC_URL || 'https://mainnet.base.org';
+const BASE_MAINNET_RPC = process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://base-rpc.publicnode.com';
 const BASE_SEPOLIA_RPC = process.env.NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL || 'https://sepolia.base.org';
 
 const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || '78531232796f972267f68a343b2f0a51';

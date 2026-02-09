@@ -1,6 +1,24 @@
 import { createPublicClient, http, isAddress as viemIsAddress, formatUnits, parseUnits } from 'viem';
 import { base, baseSepolia, mainnet, arbitrum, optimism, polygon } from 'viem/chains';
+import type { Chain } from 'viem';
 import { USDC_ADDRESS } from '@/lib/contracts/constants';
+
+// Server-safe RPC URLs — mainnet.base.org blocks requests from cloud environments (Cloudflare WAF)
+const SERVER_RPC_URLS: Record<number, string> = {
+  [mainnet.id]: process.env.NEXT_PUBLIC_MAINNET_RPC_URL || 'https://ethereum-rpc.publicnode.com',
+  [base.id]: process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://base-rpc.publicnode.com',
+  [baseSepolia.id]: process.env.NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL || 'https://sepolia.base.org',
+  [arbitrum.id]: 'https://arbitrum-one-rpc.publicnode.com',
+  [optimism.id]: 'https://optimism-rpc.publicnode.com',
+  [polygon.id]: 'https://polygon-bor-rpc.publicnode.com',
+};
+
+function createServerClient(chain: Chain) {
+  return createPublicClient({
+    chain,
+    transport: http(SERVER_RPC_URLS[chain.id]),
+  });
+}
 
 // Minimal ERC20 ABI for checking balances
 export const ERC20_ABI = [
@@ -126,10 +144,7 @@ export async function scanWalletBalances(address: string): Promise<ScanResult | 
   const results = await Promise.all(
     CHAIN_TOKENS.map(async (chainConfig) => {
       try {
-        const client = createPublicClient({
-          chain: chainConfig.chain,
-          transport: http(),
-        });
+        const client = createServerClient(chainConfig.chain);
 
         const balances = await Promise.all(
           chainConfig.tokens.map(async (token) => {

@@ -96,7 +96,7 @@ export const TERMINATION_NOTICE_PERIOD = 30 * 24 * 60 * 60; // 30 days in second
 export const CHAIN_CONFIG = {
   [base.id]: {
     name: 'Base',
-    rpcUrl: process.env.NEXT_PUBLIC_BASE_MAINNET_RPC_URL || 'https://mainnet.base.org',
+    rpcUrl: process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://base-rpc.publicnode.com',
     blockExplorer: 'https://basescan.org',
   },
   [baseSepolia.id]: {

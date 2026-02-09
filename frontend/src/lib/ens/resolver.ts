@@ -41,7 +41,7 @@ const RPC_URLS: Record<number, string> = {
   [mainnet.id]: process.env.NEXT_PUBLIC_MAINNET_RPC_URL || 'https://eth.llamarpc.com',
   [sepolia.id]: process.env.SEPOLIA_RPC_URL || 'https://rpc.sepolia.org',
   [baseSepolia.id]: process.env.NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL || 'https://sepolia.base.org',
-  [base.id]: process.env.NEXT_PUBLIC_BASE_MAINNET_RPC_URL || 'https://mainnet.base.org',
+  [base.id]: process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://base-rpc.publicnode.com',
 };
 
 function getENSType(name: string): {

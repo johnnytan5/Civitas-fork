@@ -23,7 +23,7 @@ export const NETWORK_CONFIG: NetworkConfig = {
     base: {
       chainId: 8453,
       name: 'Base',
-      rpcUrl: 'https://mainnet.base.org',
+      rpcUrl: process.env.NEXT_PUBLIC_BASE_RPC_URL || 'https://base-rpc.publicnode.com',
       usdc: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
       explorer: 'https://basescan.org',
     },
