@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { createPublicClient, http, isAddress as viemIsAddress, formatUnits, parseUnits } from 'viem';
 import { base, baseSepolia } from 'viem/chains';
 import { USDC_ADDRESS, USDC_DECIMALS } from '@/lib/contracts/constants';
-import { isENSName, isAddress, formatAddress } from '@/lib/ens/resolver';
+import { isENSName, isAddress, formatAddress, resolveENSDirect } from '@/lib/ens/resolver';
 import {
   scanWalletBalances as scanWalletBalancesLogic,
   getOptimalFundingRoutes as getOptimalFundingRoutesLogic,
@@ -50,30 +50,8 @@ const resolveENS = tool({
         };
       }
 
-      // Call the server-side ENS resolution API
-      // Edge Runtime requires absolute URLs
-      const baseUrl = process.env.VERCEL_URL
-        ? `https://${process.env.VERCEL_URL}`
-        : process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-
-      const response = await fetch(`${baseUrl}/api/resolve-ens`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        return {
-          success: false,
-          input: name,
-          address: null,
-          error: errorData.error || `Resolution failed with status ${response.status}`,
-          isENS: true,
-        };
-      }
-
-      const data = await response.json();
+      // Resolve ENS directly (no HTTP round-trip, works in Edge Runtime)
+      const data = await resolveENSDirect(name);
 
       if (!data.address) {
         return {

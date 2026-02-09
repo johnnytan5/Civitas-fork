@@ -1,6 +1,6 @@
-import { createPublicClient, http } from 'viem';
+import { createPublicClient, http, namehash, type Address } from 'viem';
 import { normalize } from 'viem/ens';
-import { mainnet } from 'viem/chains';
+import { mainnet, sepolia, baseSepolia, base } from 'viem/chains';
 
 /**
  * Resolution result from the server-side API
@@ -10,6 +10,134 @@ export interface ENSResolutionResult {
   source: 'l1' | 'l2' | 'raw';
   originalInput: string;
   error?: string;
+}
+
+// =============================================================================
+// Direct ENS Resolution (no HTTP round-trip)
+// Used by AI tools running in Edge Runtime where self-fetch is unreliable
+// =============================================================================
+
+const BASE_SEPOLIA_CONTRACTS = {
+  registry: '0x1493b2567056c2181630115660963E13A8E32735' as Address,
+  resolver: '0x6533C94869D28fAA8dF77cc63f9e2b2D6Cf77eBA' as Address,
+};
+
+const BASE_MAINNET_CONTRACTS = {
+  registry: '0x1493b2567056c2181630115660963E13A8E32735' as Address,
+  resolver: '0xC6d566A56A1aFf6508b41f6c90ff131615583BCD' as Address,
+};
+
+const L2_RESOLVER_ABI = [
+  {
+    name: 'addr',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'node', type: 'bytes32' }],
+    outputs: [{ name: '', type: 'address' }],
+  },
+] as const;
+
+const RPC_URLS: Record<number, string> = {
+  [mainnet.id]: process.env.NEXT_PUBLIC_MAINNET_RPC_URL || 'https://eth.llamarpc.com',
+  [sepolia.id]: process.env.SEPOLIA_RPC_URL || 'https://rpc.sepolia.org',
+  [baseSepolia.id]: process.env.NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL || 'https://sepolia.base.org',
+  [base.id]: process.env.NEXT_PUBLIC_BASE_MAINNET_RPC_URL || 'https://mainnet.base.org',
+};
+
+function getENSType(name: string): {
+  type: 'l1' | 'l2' | 'unknown';
+  chain: typeof mainnet | typeof sepolia | typeof baseSepolia | typeof base;
+  isTestnet: boolean;
+} {
+  const lowerName = name.toLowerCase();
+  if (lowerName.endsWith('.basetest.eth')) {
+    return { type: 'l2', chain: baseSepolia, isTestnet: true };
+  }
+  if (lowerName.endsWith('.base.eth')) {
+    return { type: 'l2', chain: base, isTestnet: false };
+  }
+  if (lowerName.endsWith('.eth')) {
+    const isTestnet = process.env.NODE_ENV === 'development' || process.env.NEXT_PUBLIC_USE_TESTNET === 'true';
+    return { type: 'l1', chain: isTestnet ? sepolia : mainnet, isTestnet };
+  }
+  return { type: 'unknown', chain: mainnet, isTestnet: false };
+}
+
+async function resolveL1ENSDirect(name: string, chain: typeof mainnet | typeof sepolia): Promise<`0x${string}` | null> {
+  try {
+    const client = createPublicClient({
+      chain,
+      transport: http(RPC_URLS[chain.id]),
+    });
+    return await client.getEnsAddress({ name: normalize(name) });
+  } catch (error) {
+    console.error(`L1 ENS resolution failed for ${name}:`, error);
+    return null;
+  }
+}
+
+async function resolveL2BasenameDirect(
+  name: string,
+  chain: typeof baseSepolia | typeof base
+): Promise<`0x${string}` | null> {
+  const contracts = chain.id === baseSepolia.id ? BASE_SEPOLIA_CONTRACTS : BASE_MAINNET_CONTRACTS;
+  try {
+    const normalizedName = normalize(name);
+    const node = namehash(normalizedName);
+    const client = createPublicClient({
+      chain,
+      transport: http(RPC_URLS[chain.id]),
+    });
+    const address = await client.readContract({
+      address: contracts.resolver,
+      abi: L2_RESOLVER_ABI,
+      functionName: 'addr',
+      args: [node],
+    });
+    if (!address || address === '0x0000000000000000000000000000000000000000') {
+      return null;
+    }
+    return address as `0x${string}`;
+  } catch (error) {
+    console.error(`L2 Basename resolution failed for ${name}:`, error);
+    return null;
+  }
+}
+
+/**
+ * Resolve ENS name directly without HTTP round-trip.
+ * Supports L1 ENS (.eth), L2 Basenames (.base.eth, .basetest.eth), and raw addresses.
+ */
+export async function resolveENSDirect(input: string): Promise<ENSResolutionResult> {
+  const trimmed = input.trim();
+
+  if (isAddress(trimmed)) {
+    return { address: trimmed as `0x${string}`, source: 'raw', originalInput: trimmed };
+  }
+
+  if (!isENSName(trimmed)) {
+    return { address: null, source: 'raw', originalInput: trimmed, error: 'Invalid format. Enter a valid address (0x...) or ENS name (.eth, .base.eth, .basetest.eth)' };
+  }
+
+  const { type, chain } = getENSType(trimmed);
+
+  if (type === 'unknown') {
+    return { address: null, source: 'raw', originalInput: trimmed, error: 'Unsupported ENS name format' };
+  }
+
+  let address: `0x${string}` | null = null;
+
+  if (type === 'l1') {
+    address = await resolveL1ENSDirect(trimmed, chain as typeof mainnet | typeof sepolia);
+  } else if (type === 'l2') {
+    address = await resolveL2BasenameDirect(trimmed, chain as typeof baseSepolia | typeof base);
+  }
+
+  if (!address) {
+    return { address: null, source: type, originalInput: trimmed, error: `Could not resolve "${trimmed}". The name may not exist or may not have an address record set.` };
+  }
+
+  return { address, source: type, originalInput: trimmed };
 }
 
 /**
