@@ -151,7 +151,7 @@ export async function POST(req: Request) {
     const { object } = await generateObject({
       model: google('gemini-2.5-flash'),
       schema,
-      prompt: `${extractionPrompt}\n\nConversation:\n${JSON.stringify(messages)}`,
+      prompt: `${extractionPrompt}\n\n${extractionPrompt}\n\nConversation:\n${JSON.stringify(messages)}`,
     });
 
     // Calculate completeness (handle optional fields)

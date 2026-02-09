@@ -164,8 +164,8 @@ export function useTemplateChat() {
   const extractConfig = async () => {
     if (messages.length === 0 || !activeTemplate) return;
 
-    // Only extract if there are at least 2+ exchanges (4+ messages)
-    if (messages.length < 4) {
+    // Only extract if there is at least 1 exchange (2+ messages)
+    if (messages.length < 2) {
       console.log('Skipping extraction: insufficient conversation data');
       return;
     }

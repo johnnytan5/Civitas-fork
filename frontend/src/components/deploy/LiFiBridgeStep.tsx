@@ -105,36 +105,37 @@ export function LiFiBridgeStep({
     }
   }, [preselectedRoute, recommendedSource]);
 
-  // Fetch user's tokens when chain changes
+  // Fetch user's tokens when chain changes (only for manual mode — not needed in autoExecute)
   useEffect(() => {
-    if (!address || !fromChainId) return;
+    if (autoExecute || !address || !fromChainId) return;
     setIsLoadingTokens(true);
 
-    // Use LI.FI REST API to get token balances
-    fetch(`https://li.quest/v1/balances?walletAddress=${address}&chains=${fromChainId}`, {
+    // Use LI.FI REST API to get token balances for the manual token dropdown
+    fetch(`https://li.quest/v1/tokens?chains=${fromChainId}`, {
       headers: process.env.NEXT_PUBLIC_LIFI_API_KEY
         ? { 'x-lifi-api-key': process.env.NEXT_PUBLIC_LIFI_API_KEY }
         : {},
     })
       .then(res => res.json())
       .then(data => {
-        const chainTokens = data[fromChainId] || data || [];
-        const tokens = chainTokens
-          .filter((t: any) => parseFloat(t.amount || '0') > 0)
-          // Sort by USD value desc (if price available) or amount
-          .sort((a: any, b: any) => parseFloat(b.amount || '0') - parseFloat(a.amount || '0'));
-        setAvailableTokens(tokens);
+        // /v1/tokens returns { tokens: { [chainId]: Token[] } }
+        const chainTokens = data?.tokens?.[fromChainId] || [];
+        // We don't get balances from this endpoint, so just show available tokens
+        setAvailableTokens(chainTokens.slice(0, 50).map((t: any) => ({
+          symbol: t.symbol,
+          address: t.address,
+          name: t.name,
+        })));
 
         // If current selected token is not in list (and not AI recommendation), default to USDC or first token
-        if (!recommendedSource && tokens.length > 0 && !tokens.find((t: any) => t.address === fromTokenAddress)) {
-           // Default to USDC if available, else first token
-           const usdc = tokens.find((t: any) => t.symbol === 'USDC');
+        if (!recommendedSource && chainTokens.length > 0 && !chainTokens.find((t: any) => t.address?.toLowerCase() === fromTokenAddress?.toLowerCase())) {
+           const usdc = chainTokens.find((t: any) => t.symbol === 'USDC');
            if (usdc) {
              setFromTokenAddress(usdc.address);
              setFromTokenSymbol('USDC');
            } else {
-             setFromTokenAddress(tokens[0].address);
-             setFromTokenSymbol(tokens[0].symbol);
+             setFromTokenAddress(chainTokens[0].address);
+             setFromTokenSymbol(chainTokens[0].symbol);
            }
         }
       })
@@ -144,7 +145,7 @@ export function LiFiBridgeStep({
         setAvailableTokens([{ symbol: 'USDC', address: USDC_ADDRESSES[fromChainId] }]);
       })
       .finally(() => setIsLoadingTokens(false));
-  }, [address, fromChainId, recommendedSource, fromTokenAddress]);
+  }, [autoExecute, address, fromChainId, recommendedSource, fromTokenAddress]);
 
   // Auto-trigger route discovery and execution when autoExecute is true
   useEffect(() => {

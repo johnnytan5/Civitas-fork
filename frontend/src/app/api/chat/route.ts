@@ -50,8 +50,8 @@ export async function POST(req: Request) {
 
     // Pass converted messages to streamText
     const result = streamText({
-      model: google('gemini-2.5-flash'),
-      system: systemPrompt,
+      model: google('gemini-3-flash-preview'),
+      system: `${systemPrompt}\n\n${systemPrompt}`,
       messages: modelMessages,
       tools: civitasTools,
       stopWhen: stepCountIs(5),
