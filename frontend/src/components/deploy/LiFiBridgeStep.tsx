@@ -5,7 +5,7 @@ import { useAccount, useConfig } from 'wagmi';
 import { getPublicClient } from '@wagmi/core';
 import { getRoutes, executeRoute, type Route, type RoutesRequest, type TransactionRequestParameters } from '@lifi/sdk';
 import { configureLiFiSDK } from '@/lib/lifi/sdk-config';
-import { LIFI_SUPPORTED_CHAIN_IDS, USDC_ADDRESSES } from '@/lib/lifi/constants';
+import { LIFI_SUPPORTED_CHAIN_IDS, USDC_ADDRESSES, NATIVE_TOKEN_ADDRESS, ETH_DECIMALS } from '@/lib/lifi/constants';
 import { formatUnits } from 'viem';
 
 interface LiFiBridgeStepProps {
@@ -29,6 +29,7 @@ interface LiFiBridgeStepProps {
     action?: any; // LI.FI route action for direct execution
   };
   autoExecute?: boolean; // Skip UI and execute immediately
+  destinationToken?: 'USDC' | 'ETH'; // Token to receive on Base. Defaults to 'USDC'.
 }
 
 type BridgeState = 'idle' | 'loading-routes' | 'selecting' | 'executing' | 'completed' | 'error';
@@ -58,6 +59,7 @@ export function LiFiBridgeStep({
   recommendedSource,
   preselectedRoute,
   autoExecute = false,
+  destinationToken = 'USDC',
 }: LiFiBridgeStepProps) {
   const { address } = useAccount();
   const wagmiConfig = useConfig();
@@ -83,8 +85,12 @@ export function LiFiBridgeStep({
   const [availableTokens, setAvailableTokens] = useState<any[]>([]);
   const [isLoadingTokens, setIsLoadingTokens] = useState(false);
 
-  // Convert amount prop (bigint) to USDC string for display
-  const amountInUsdc = formatUnits(amount, 6);
+  // Determine destination token address and decimals
+  const toTokenDecimals = destinationToken === 'ETH' ? ETH_DECIMALS : 6;
+  const tokenSymbol = destinationToken === 'ETH' ? 'ETH' : 'USDC';
+
+  // Convert amount prop (bigint) to display string
+  const amountDisplay = formatUnits(amount, toTokenDecimals);
 
   // Initialize from preselected route or recommendation
   useEffect(() => {
@@ -105,10 +111,14 @@ export function LiFiBridgeStep({
     setIsLoadingTokens(true);
 
     // Use LI.FI REST API to get token balances
-    fetch(`https://li.quest/v1/token/balances?walletAddress=${address}&chains=${fromChainId}`)
+    fetch(`https://li.quest/v1/balances?walletAddress=${address}&chains=${fromChainId}`, {
+      headers: process.env.NEXT_PUBLIC_LIFI_API_KEY
+        ? { 'x-lifi-api-key': process.env.NEXT_PUBLIC_LIFI_API_KEY }
+        : {},
+    })
       .then(res => res.json())
       .then(data => {
-        const chainTokens = data[fromChainId] || [];
+        const chainTokens = data[fromChainId] || data || [];
         const tokens = chainTokens
           .filter((t: any) => parseFloat(t.amount || '0') > 0)
           // Sort by USD value desc (if price available) or amount
@@ -274,9 +284,11 @@ export function LiFiBridgeStep({
     return updated;
   };
 
-  // Destination is always Base USDC
+  // Destination is always Base
   const toChainId = LIFI_SUPPORTED_CHAIN_IDS.BASE_MAINNET;
-  const toTokenAddress = USDC_ADDRESSES[toChainId];
+  const toTokenAddress = destinationToken === 'ETH'
+    ? NATIVE_TOKEN_ADDRESS
+    : USDC_ADDRESSES[toChainId];
 
   const sourceChains = [
     { id: LIFI_SUPPORTED_CHAIN_IDS.ETHEREUM_MAINNET, name: 'Ethereum', nativeToken: 'ETH' },
@@ -301,16 +313,15 @@ export function LiFiBridgeStep({
     setRoutes([]);
 
     try {
-      // Use USDC as source token (USDC → USDC bridging only)
-      const fromTokenAddress = USDC_ADDRESSES[fromChainId];
-
+      // Use the selected source token (set from preselectedRoute, recommendedSource, or user selection)
+      // For ETH bridging, this will be the native token address; for USDC, the USDC address
       if (!fromTokenAddress) {
-        setError('USDC not supported on selected chain');
+        setError('No source token selected');
         setState('error');
         return;
       }
 
-      // Use the amount prop directly (already in 6 decimals as bigint)
+      // Use the amount prop directly (already in correct decimals as bigint)
       const fromAmountWei = amount.toString();
 
       const routesRequest: RoutesRequest = {
@@ -334,7 +345,7 @@ export function LiFiBridgeStep({
       const routeOptions: RouteOption[] = result.routes.slice(0, 3).map((route) => ({
         route,
         estimatedTime: route.steps?.reduce((acc, step) => acc + (step.estimate?.executionDuration || 0), 0) || 0,
-        estimatedOutput: formatUnits(BigInt(route.toAmount || '0'), 6),
+        estimatedOutput: formatUnits(BigInt(route.toAmount || '0'), toTokenDecimals),
         gasCost: route.gasCostUSD || '0',
       }));
 
@@ -345,7 +356,7 @@ export function LiFiBridgeStep({
       setError(err.message || 'Failed to fetch routes');
       setState('error');
     }
-  }, [address, amount, fromChainId, toChainId, toTokenAddress, destinationAddress]);
+  }, [address, amount, fromChainId, fromTokenAddress, toChainId, toTokenAddress, destinationAddress]);
 
   const executeSelectedRoute = useCallback(async () => {
     if (!selectedRoute) return;
@@ -470,11 +481,11 @@ export function LiFiBridgeStep({
 
           <div>
             <label className="block text-sm font-medium mb-2">
-              Amount (USDC)
+              Amount ({tokenSymbol})
             </label>
             <input
               type="text"
-              value={amountInUsdc}
+              value={amountDisplay}
               readOnly
               className="w-full p-3 border-2 border-black rounded bg-gray-100 cursor-not-allowed"
             />
@@ -516,7 +527,7 @@ export function LiFiBridgeStep({
             >
               <div className="flex justify-between items-center">
                 <div>
-                  <p className="font-mono font-bold">{option.estimatedOutput} USDC</p>
+                  <p className="font-mono font-bold">{option.estimatedOutput} {tokenSymbol}</p>
                   <p className="text-xs text-gray-500">
                     ~{Math.round(option.estimatedTime / 60)} min • Gas: ${option.gasCost}
                   </p>

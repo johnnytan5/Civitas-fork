@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { createPublicClient, http, isAddress as viemIsAddress, formatUnits, parseUnits } from 'viem';
 import { base, baseSepolia } from 'viem/chains';
 import { USDC_ADDRESS, USDC_DECIMALS } from '@/lib/contracts/constants';
+import { NATIVE_TOKEN_ADDRESS, ETH_DECIMALS } from '@/lib/lifi/constants';
 import { isENSName, isAddress, formatAddress, resolveENSDirect } from '@/lib/ens/resolver';
 import { templateRegistry } from '@/lib/templates/registry';
 import {
@@ -331,11 +332,12 @@ const getOptimalFundingRoute = tool({
   description:
     'Calculate and compare optimal routes to bridge funds to Base from multiple potential source tokens/chains. ' +
     'Returns a ranked list of routes with fees, estimated time, and gas costs. ' +
-    'If destinationAddress is not provided, defaults to bridging to the user\'s wallet.',
+    'If destinationAddress is not provided, defaults to bridging to the user\'s wallet. ' +
+    'IMPORTANT: Set targetToken="ETH" when bridging ETH for gas fees, or targetToken="USDC" (default) for contract funding.',
   inputSchema: z.object({
     walletAddress: z.string().describe('User wallet address'),
     destinationAddress: z.string().optional().describe('The destination address on Base (contract or wallet). Defaults to walletAddress if not provided.'),
-    amount: z.string().describe('Required amount in USDC (e.g. "1200" or "1")'),
+    amount: z.string().describe('Required amount in the target token. For USDC: e.g. "1200". For ETH: e.g. "0.001". Must match the targetToken parameter.'),
     candidateTokens: z
       .array(
         z.object({
@@ -347,16 +349,26 @@ const getOptimalFundingRoute = tool({
       )
       .max(10)
       .describe('List of tokens to compare (from scanWalletBalances results). Include balance so routes use actual available amounts.'),
+    targetToken: z.enum(['USDC', 'ETH']).default('USDC').describe(
+      'Token to receive on Base. Use "USDC" for contract funding, "ETH" for gas fees. Default: USDC.'
+    ),
   }),
-  execute: async ({ walletAddress, destinationAddress, amount, candidateTokens }) => {
+  execute: async ({ walletAddress, destinationAddress, amount, candidateTokens, targetToken }) => {
     // Default destination to wallet if not provided
     const destination = destinationAddress || walletAddress;
+
+    // Determine destination token address based on targetToken
+    const toTokenAddress = targetToken === 'ETH'
+      ? NATIVE_TOKEN_ADDRESS
+      : USDC_ADDRESS[base.id];
 
     console.log('[getOptimalFundingRoute] Starting route calculation:', {
       walletAddress,
       destinationAddress,
       destination,
       amount,
+      targetToken,
+      toTokenAddress,
       candidateCount: candidateTokens.length,
     });
 
@@ -397,22 +409,24 @@ const getOptimalFundingRoute = tool({
 
             let amountForQuote = parseUnits(effectiveAmount, decimals).toString();
             if (candidate.symbol === 'ETH' || candidate.symbol === 'MATIC') {
-              // For native tokens, use actual balance or a small amount for the quote
-              const ethAmount = candidate.balance && parseFloat(candidate.balance) > 0
-                ? candidate.balance
-                : '0.1';
-              amountForQuote = parseUnits(ethAmount, decimals).toString();
+              // Use fixed amount for route comparison (gas cost + time estimation only).
+              // Actual bridge amount is set later by LiFiBridgeStep.
+              amountForQuote = parseUnits('0.1', decimals).toString();
             }
 
             const response = await fetch(`https://li.quest/v1/quote?${new URLSearchParams({
               fromChain: candidate.chainId.toString(),
               toChain: base.id.toString(),
               fromToken: candidate.tokenAddress,
-              toToken: USDC_ADDRESS[base.id],
+              toToken: toTokenAddress,
               fromAmount: amountForQuote,
               fromAddress: walletAddress,
               toAddress: destination,
-            })}`);
+            })}`, {
+              headers: process.env.NEXT_PUBLIC_LIFI_API_KEY
+                ? { 'x-lifi-api-key': process.env.NEXT_PUBLIC_LIFI_API_KEY }
+                : {},
+            });
 
             if (!response.ok) return null;
             const data = await response.json();
@@ -425,7 +439,8 @@ const getOptimalFundingRoute = tool({
               executionDuration: data.estimate.executionDuration,
               tool: data.tool,
               steps: data.includedSteps?.length || 1,
-              action: data.action
+              action: data.action,
+              targetToken,
             };
 
           } catch (e) {
@@ -455,7 +470,9 @@ const getOptimalFundingRoute = tool({
         recommendation: {
           bestRoute: validRoutes[0],
           reason: `Cheapest option: $${parseFloat(validRoutes[0].gasCostUsd).toFixed(2)} gas fee via ${validRoutes[0].tool}`
-        }
+        },
+        targetToken,
+        amount,
       };
     } catch (e: any) {
       return { success: false, error: e.message };

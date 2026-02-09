@@ -237,7 +237,11 @@ export async function getOptimalFundingRoutes(
             fromAmount: amountForQuote,
             fromAddress: walletAddress,
             toAddress: destinationAddress,
-          })}`);
+          })}`, {
+            headers: process.env.NEXT_PUBLIC_LIFI_API_KEY
+              ? { 'x-lifi-api-key': process.env.NEXT_PUBLIC_LIFI_API_KEY }
+              : {},
+          });
 
           if (!response.ok) return null;
           const data = await response.json();

@@ -3,7 +3,9 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { useAccount } from 'wagmi';
+import { parseUnits } from 'viem';
 import { LiFiBridgeStep } from '@/components/deploy';
+import { ETH_DECIMALS } from '@/lib/lifi/constants';
 import { StatusBanner } from '@/components/ui/StatusBanner';
 import { LoadingSquares } from '@/components/ui/LoadingSquares';
 
@@ -19,9 +21,10 @@ interface BridgeRecommendationModalProps {
     tool: string;
   };
   walletAddress: `0x${string}`; // User's wallet on Base (destination for bridge)
-  amount: string; // Amount in USDC (e.g., "1000")
+  amount: string; // Amount in destination token (e.g., "1000" for USDC or "0.001" for ETH)
   onBridgeCompleted?: () => void;
   onDecline?: () => void;
+  destinationToken?: 'USDC' | 'ETH'; // Token to receive on Base. Defaults to 'USDC'.
 }
 
 type ModalState = 'idle' | 'ready' | 'executing' | 'completed' | 'error';
@@ -43,13 +46,17 @@ export default function BridgeRecommendationModal({
   amount,
   onBridgeCompleted,
   onDecline,
+  destinationToken = 'USDC',
 }: BridgeRecommendationModalProps) {
   const { address: connectedAddress } = useAccount();
   const [modalState, setModalState] = useState<ModalState>('idle');
   const [error, setError] = useState<string | null>(null);
 
-  // Convert amount to bigint (6 decimals for USDC)
-  const amountBigInt = BigInt(Math.floor(parseFloat(amount) * 1e6));
+  const destTokenSymbol = destinationToken === 'ETH' ? 'ETH' : 'USDC';
+  const destTokenDecimals = destinationToken === 'ETH' ? ETH_DECIMALS : 6;
+
+  // Convert amount to bigint using correct decimals
+  const amountBigInt = parseUnits(amount, destTokenDecimals);
 
   useEffect(() => {
     if (isOpen) {
@@ -152,7 +159,7 @@ export default function BridgeRecommendationModal({
                           <div>
                             <p className="font-mono text-xs font-bold uppercase opacity-60">To</p>
                             <p className="font-headline text-lg">{destinationChain.name}</p>
-                            <p className="font-mono text-sm font-bold">USDC</p>
+                            <p className="font-mono text-sm font-bold">{destTokenSymbol}</p>
                           </div>
                         </div>
                       </div>
@@ -163,7 +170,7 @@ export default function BridgeRecommendationModal({
                   <div className="grid grid-cols-3 gap-3">
                     <div className="bg-white border-[2px] border-black p-3">
                       <p className="font-mono text-xs uppercase opacity-60 mb-1">Amount</p>
-                      <p className="font-mono font-bold">{amount} USDC</p>
+                      <p className="font-mono font-bold">{amount} {destTokenSymbol}</p>
                     </div>
                     <div className="bg-white border-[2px] border-black p-3">
                       <p className="font-mono text-xs uppercase opacity-60 mb-1">Est. Time</p>
@@ -187,7 +194,7 @@ export default function BridgeRecommendationModal({
               {/* Info Banner */}
               <div className="bg-blue-50 border-[2px] border-black p-4">
                 <p className="font-mono text-sm">
-                  💡 <span className="font-bold">Pro Tip:</span> Funds will be bridged to your wallet on Base. You'll need USDC + ETH for gas before deploying contracts.
+                  💡 <span className="font-bold">Pro Tip:</span> {destTokenSymbol} will be bridged to your wallet on Base. {destinationToken === 'ETH' ? 'You need ETH for gas fees when deploying contracts.' : 'You\'ll also need ETH for gas before deploying contracts.'}
                 </p>
               </div>
             </>
@@ -217,6 +224,7 @@ export default function BridgeRecommendationModal({
                   tool: route.tool,
                 }}
                 autoExecute={true}
+                destinationToken={destinationToken}
               />
             </div>
           )}

@@ -15,6 +15,7 @@ export function configureLiFiSDK(wagmiConfig: Config) {
 
   createConfig({
     integrator: process.env.NEXT_PUBLIC_LIFI_INTEGRATOR || 'civitas',
+    apiKey: process.env.NEXT_PUBLIC_LIFI_API_KEY,
     providers: [
       EVM({
         getWalletClient: () => getWalletClient(wagmiConfig),

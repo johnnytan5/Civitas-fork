@@ -77,6 +77,7 @@ export default function CreatePage() {
   } | null>(null);
   const [showBridgeModal, setShowBridgeModal] = useState(false);
   const [bridgeAmount, setBridgeAmount] = useState<string | null>(null);
+  const [bridgeDestinationToken, setBridgeDestinationToken] = useState<'USDC' | 'ETH'>('USDC');
   const [bridgeCompleted, setBridgeCompleted] = useState(false);
   const processedToolCallIds = useRef<Set<string>>(new Set());
 
@@ -113,10 +114,19 @@ export default function CreatePage() {
             };
             setAiRecommendation(rec);
 
-            // Extract actual bridge amount from route data (fromAmount is in raw token units, 6 decimals for USDC)
-            const rawAmount = best.action?.fromAmount;
-            if (rawAmount) {
-              setBridgeAmount((Number(rawAmount) / 1e6).toString());
+            // Set destination token type from tool result
+            const targetToken = result.targetToken || 'USDC';
+            setBridgeDestinationToken(targetToken);
+
+            // Always use the tool's amount param as bridge amount.
+            // For ETH: e.g. "0.001". For USDC: e.g. "1200".
+            // Falls through to extractedConfig only if result.amount is missing.
+            if (result.amount) {
+              setBridgeAmount(result.amount);
+            } else if (targetToken === 'ETH') {
+              setBridgeAmount('0.001');
+            } else {
+              setBridgeAmount(null);
             }
 
             setShowBridgeModal(true);
@@ -655,6 +665,7 @@ export default function CreatePage() {
               onDecline={() => {
                 setShowBridgeModal(false);
               }}
+              destinationToken={bridgeDestinationToken}
             />
           ) : null;
         })()}

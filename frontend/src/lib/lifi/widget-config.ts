@@ -21,6 +21,7 @@ export function createWidgetConfig({
 
   return {
     integrator: process.env.NEXT_PUBLIC_LIFI_INTEGRATOR || 'civitas',
+    apiKey: process.env.NEXT_PUBLIC_LIFI_API_KEY,
     variant: 'compact',
     subvariant: 'split',
 

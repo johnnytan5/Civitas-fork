@@ -26,6 +26,10 @@ export const USDC_ADDRESSES: Record<number, `0x${string}`> = {
   [TESTNET_CHAIN_IDS.BASE_SEPOLIA]: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
 } as const;
 
+// Native token (ETH) address used by LI.FI
+export const NATIVE_TOKEN_ADDRESS = '0x0000000000000000000000000000000000000000' as `0x${string}`;
+export const ETH_DECIMALS = 18;
+
 // Helper to check if chain is supported by LI.FI
 export function isLiFiSupported(chainId: number): boolean {
   return Object.values(LIFI_SUPPORTED_CHAIN_IDS).includes(chainId as typeof LIFI_SUPPORTED_CHAIN_IDS[keyof typeof LIFI_SUPPORTED_CHAIN_IDS]);
